@@ -1,12 +1,12 @@
 [project]
-name = "context-drift-sentinel"
+name = "stilltrue"
 version = "0.1.0"
 description = "Finds DataHub context that has drifted out of sync with reality, proposes fixes with citations, and writes verdicts back to the graph."
 requires-python = ">=3.11"
 dependencies = ["acryl-datahub", "datahub-agent-context", "typer", "PyYAML"]
 
 [project.scripts]
-sentinel = "sentinel.cli:app"
+stilltrue = "stilltrue.cli:app"
 
 [build-system]
 requires = ["setuptools>=68"]

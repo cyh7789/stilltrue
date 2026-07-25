@@ -1,4 +1,4 @@
-# Context Drift Sentinel
+# StillTrue
 
 **Your data documentation is already lying to you. This finds out where.**
 
@@ -20,7 +20,7 @@ This is not a taxi problem. DataHub's own writing names it precisely:
 > and AI tools that work in demos but fail in production.
 
 Everyone is busy pointing agents *at* the catalog. Nobody is checking whether
-what's in the catalog is still true. Context Drift Sentinel is an agent whose
+what's in the catalog is still true. StillTrue is an agent whose
 job is the catalog itself: it reads what humans wrote, compares it against what
 the schema, lineage and query history actually do, and reports the places where
 the two have come apart — with citations, and never writing anything back without
@@ -29,12 +29,12 @@ a human confirming that exact text.
 ## What it does
 
 ```bash
-sentinel scan --limit 25       # read DataHub, run deterministic detectors
-sentinel findings              # what drifted, and what the evidence is
-sentinel apply <id> --to "…"   # draft a fix, gate it, show the diff and its hash
-sentinel apply <id> --to "…" \
+stilltrue scan --limit 25       # read DataHub, run deterministic detectors
+stilltrue findings              # what drifted, and what the evidence is
+stilltrue apply <id> --to "…"   # draft a fix, gate it, show the diff and its hash
+stilltrue apply <id> --to "…" \
     --approve <hash> --commit  # confirm that exact text, then write it back
-sentinel verify                # prove the audit trail wasn't tampered with
+stilltrue verify                # prove the audit trail wasn't tampered with
 ```
 
 Four checks across three families, only one of which is allowed near a language
@@ -47,10 +47,10 @@ model:
 | **D3** lineage drift | "derived from X" | actual upstreams | deterministic |
 | **D5** semantic conflict | one glossary term, two definitions | how each side filters in real queries | prefilter → LLM → citation gate |
 
-D1 and D3 run in `sentinel scan`. **D5 is implemented but not yet wired into the
+D1 and D3 run in `stilltrue scan`. **D5 is implemented but not yet wired into the
 CLI**: its judge is injected rather than built in, so the module itself makes no
 network calls and can be tested against a fake. Connecting a real LLM judge is
-the remaining step — see `src/sentinel/semantic.py`.
+the remaining step — see `src/stilltrue/semantic.py`.
 
 The gaps in the numbering are deliberate and worth stating plainly. The design
 enumerated five drift families; **D2 (freshness drift — a description claiming a
@@ -71,8 +71,8 @@ own catalog instead:
 
 ```bash
 datahub datapack load showcase-ecommerce
-sentinel scan --limit 25
-sentinel findings
+stilltrue scan --limit 25
+stilltrue findings
 ```
 
 Two worked examples, both unedited command output:
@@ -136,8 +136,8 @@ before calling anything drift takes that to **zero**, while both NYC TLC
 ground-truth events are still caught:
 
 ```
-$ sentinel scan --urn "urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)"
-  2 findings (2 drift, 0 abstained)
+$ stilltrue scan --urn "urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)"
+  2 drift, 5 verified current, 0 abstained (7 checks)
 
   D1_SCHEMA_BREAK  airport_fee -> likely renamed to `Airport_fee`
   D1_UNDOCUMENTED  cbd_congestion_fee exists in the schema but has no description
@@ -195,7 +195,7 @@ regenerate with `python3 bench/run_bench.py`):
 | B0 — no context, prose only | 0/2 | 0 | both |
 | B1 — coverage only (what DataHub already shows) | 1/2 | 0 | the rename |
 | B2 — prose vs schema, case-insensitive | 0/2 | 0 | both |
-| **Context Drift Sentinel** | **2/2** | **0** | — |
+| **StillTrue** | **2/2** | **0** | — |
 
 **B1** is the honest one to beat: DataHub's documentation-coverage view already
 tells you which fields lack a description, and it finds the undocumented column.

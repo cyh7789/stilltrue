@@ -1,6 +1,6 @@
 # Benchmark: NYC TLC
 
-> Generated 2026-07-25T17:47:18+00:00 by `bench/run_bench.py`. Rerun it to reproduce every number below.
+> Generated 2026-07-25T18:10:46+00:00 by `bench/run_bench.py`. Rerun it to reproduce every number below.
 
 **Expected findings (2):** `airport_fee`, `cbd_congestion_fee`
 
@@ -22,7 +22,7 @@ timeline and the frozen-holdout claim that was withdrawn.
 | B0 no context | 0/2 | 0 | — | `airport_fee`, `cbd_congestion_fee` |
 | B1 coverage only | 1/2 | 0 | `cbd_congestion_fee` | `airport_fee` |
 | B2 case-insensitive | 0/2 | 0 | — | `airport_fee`, `cbd_congestion_fee` |
-| Context Drift Sentinel | 2/2 | 0 | `airport_fee`, `cbd_congestion_fee` | — |
+| StillTrue | 2/2 | 0 | `airport_fee`, `cbd_congestion_fee` | — |
 
 ## What each baseline shows
 

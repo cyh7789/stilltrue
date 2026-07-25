@@ -50,7 +50,7 @@ def main() -> None:
         server = sys.argv[sys.argv.index("--server") + 1]
 
     from baselines import evaluate
-    from sentinel.adapter import ReadOnlyDataHubAdapter, authored_description
+    from stilltrue.adapter import ReadOnlyDataHubAdapter, authored_description
 
     expected = expected_from_oracle()
 

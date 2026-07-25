@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / "src"))
 
 from oracles.mine_drift_labels import sql_columns_at  # noqa: E402
-from sentinel.detectors import detect_schema_break  # noqa: E402
+from stilltrue.detectors import detect_schema_break  # noqa: E402
 
 TIER_A = ("IDENTIFIER_CHANGE", "DEPRECATION")
 

@@ -2,7 +2,7 @@
 
 > 事實描述，查核日 2026-07-26。距提交截止 2026-08-10 17:00 EDT 剩 15 天。
 > repo：`cyh7789/stilltrue`（private），11 個 commit，42 個測試通過。
-> ⚠️ 對外名 **StillTrue**，但**程式碼內套件名與 CLI 仍是 `sentinel`**，尚未統一。
+> ⚠️ 對外名 **StillTrue**，但**程式碼內套件名與 CLI 仍是 `stilltrue`**，尚未統一。
 
 ## 1. 題目與賽道
 
@@ -17,14 +17,14 @@
 
 | 模組 | 內容 |
 |---|---|
-| `src/sentinel/adapter.py` | 唯讀 adapter，包 Agent Context Kit 的 5 個讀取工具（get_entities、list_schema_fields、get_lineage、get_dataset_queries、grep_documents）。**Kit 另有 `search`、`search_documents` 未包**——掃描範圍由 URN 清單或 `--limit` 決定，偵測路徑不需要搜尋。寫入工具未 import。含 `authored_description()`：editableProperties 優先、fallback properties |
-| `src/sentinel/evidence.py` | 證據紀錄。欄位：`entity_urn`、`source_function`、`captured_at`、`payload_hash`、`payload`。**`evidence_id` 由「URN + function + payload」內容決定，不含 `captured_at`**——重跑同一觀測產生同一 id，既有引用不會失效；但擷取時間本身有存在紀錄裡（`evidence.py:47` 與 `to_dict()`）。`EvidenceStore` 支援跨命令 hydrate |
-| `src/sentinel/detectors.py` | D1 schema 斷鏈、D1 未文件化欄位、D3 lineage 漂移。全確定性，無 LLM。三態 verdict **皆會產出**：引用解析成功記 CURRENT、有改名候選記 DRIFT、無候選且來自表描述記 INSUFFICIENT_EVIDENCE |
-| `src/sentinel/semantic.py` | D5 語意漂移。確定性預篩 → 注入式判讀器 → 引文閘。模組本身不發網路請求。**未接真實 LLM，未接進 CLI** |
-| `src/sentinel/proposal.py` | Proposal + PolicyGate + `check_approval()`。Gate 擋六類：白名單外 aspect、非 DRIFT verdict、無證據、引用不存在證據、前後相同、清空內容。確認另有一關：`--approve <proposal_hash>`。hash 的 canonical payload 為 `{urn, aspect, subject, before, after, verdict, evidence}` 七項全覆蓋，改任一項即 STALE。**這是內容鎖，不是授權邊界**：不帶身分、不帶簽章，能跑 `apply` 的人自己 dry-run 就拿得到 token |
-| `src/sentinel/executor.py` | 寫前重讀（TOCTOU）、冪等鍵、寫後回讀。VERIFY_FAILED 不自動重試 |
-| `src/sentinel/ledger.py` | append-only JSONL，hash 鏈。verify 可抓內容竄改、刪除、順序調換。**被拒絕的嘗試也入鏈**（NOT_APPROVED / STALE） |
-| `src/sentinel/cli.py` | `sentinel scan / findings / apply / verify` |
+| `src/stilltrue/adapter.py` | 唯讀 adapter，包 Agent Context Kit 的 5 個讀取工具（get_entities、list_schema_fields、get_lineage、get_dataset_queries、grep_documents）。**Kit 另有 `search`、`search_documents` 未包**——掃描範圍由 URN 清單或 `--limit` 決定，偵測路徑不需要搜尋。寫入工具未 import。含 `authored_description()`：editableProperties 優先、fallback properties |
+| `src/stilltrue/evidence.py` | 證據紀錄。欄位：`entity_urn`、`source_function`、`captured_at`、`payload_hash`、`payload`。**`evidence_id` 由「URN + function + payload」內容決定，不含 `captured_at`**——重跑同一觀測產生同一 id，既有引用不會失效；但擷取時間本身有存在紀錄裡（`evidence.py:47` 與 `to_dict()`）。`EvidenceStore` 支援跨命令 hydrate |
+| `src/stilltrue/detectors.py` | D1 schema 斷鏈、D1 未文件化欄位、D3 lineage 漂移。全確定性，無 LLM。三態 verdict **皆會產出**：引用解析成功記 CURRENT、有改名候選記 DRIFT、無候選且來自表描述記 INSUFFICIENT_EVIDENCE |
+| `src/stilltrue/semantic.py` | D5 語意漂移。確定性預篩 → 注入式判讀器 → 引文閘。模組本身不發網路請求。**未接真實 LLM，未接進 CLI** |
+| `src/stilltrue/proposal.py` | Proposal + PolicyGate + `check_approval()`。Gate 擋六類：白名單外 aspect、非 DRIFT verdict、無證據、引用不存在證據、前後相同、清空內容。確認另有一關：`--approve <proposal_hash>`。hash 的 canonical payload 為 `{urn, aspect, subject, before, after, verdict, evidence}` 七項全覆蓋，改任一項即 STALE。**這是內容鎖，不是授權邊界**：不帶身分、不帶簽章，能跑 `apply` 的人自己 dry-run 就拿得到 token |
+| `src/stilltrue/executor.py` | 寫前重讀（TOCTOU）、冪等鍵、寫後回讀。VERIFY_FAILED 不自動重試 |
+| `src/stilltrue/ledger.py` | append-only JSONL，hash 鏈。verify 可抓內容竄改、刪除、順序調換。**被拒絕的嘗試也入鏈**（NOT_APPROVED / STALE） |
+| `src/stilltrue/cli.py` | `stilltrue scan / findings / apply / verify` |
 | `Makefile` + `scripts/demo.sh` | `make demo`（全閉環含兩次自動拒寫，可重跑）、`make bench-replay`、`make datahub-up`、`make test` |
 
 ## 3. 實測數字
@@ -111,7 +111,7 @@ read-back VERIFIED → 重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT�
 12. repo 為 private，未轉 public
 13. Devpost 表單未提交
 14. L3 可見證據未產出：DataHub UI 截圖／錄影 + 受影響 URN 清單
-15. 套件名與 CLI 仍是 `sentinel`，未統一為 StillTrue
+15. 套件名與 CLI 仍是 `stilltrue`，未統一為 StillTrue
 
 **已知失真：**
 

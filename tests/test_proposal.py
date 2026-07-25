@@ -10,8 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sentinel.evidence import Evidence, EvidenceStore  # noqa: E402
-from sentinel.proposal import PolicyGate, Proposal, check_approval  # noqa: E402
+from stilltrue.evidence import Evidence, EvidenceStore  # noqa: E402
+from stilltrue.proposal import PolicyGate, Proposal, check_approval  # noqa: E402
 
 URN = "urn:li:dataset:(urn:li:dataPlatform:s3,tlc.yellow_tripdata,PROD)"
 

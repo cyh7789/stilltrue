@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sentinel.semantic import (  # noqa: E402
+from stilltrue.semantic import (  # noqa: E402
     Judgment,
     TermAttachment,
     detect_semantic_drift,

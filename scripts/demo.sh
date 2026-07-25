@@ -10,31 +10,31 @@ FIXED='NYC Yellow Taxi trip records. Each row is one completed trip. Fare compon
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 
 step "1. Scan"
-RUN=$(sentinel scan --urn "$URN" --server "$SERVER" | tee /dev/stderr | sed -n 's/^run \([0-9a-f]*\):.*/\1/p')
-sentinel findings
+RUN=$(stilltrue scan --urn "$URN" --server "$SERVER" | tee /dev/stderr | sed -n 's/^run \([0-9a-f]*\):.*/\1/p')
+stilltrue findings
 
-FINDING=$(sentinel findings | grep SCHEMA_BREAK | sed 's/.*\[\([^]]*\)\].*/\1/')
+FINDING=$(stilltrue findings | grep SCHEMA_BREAK | sed 's/.*\[\([^]]*\)\].*/\1/')
 
 step "2. A write with no confirmation is refused"
-sentinel apply "$FINDING" --to "$FIXED" --commit --server "$SERVER" && exit 1 || true
+stilltrue apply "$FINDING" --to "$FIXED" --commit --server "$SERVER" && exit 1 || true
 
 step "3. Confirming one text and writing another is refused"
 # Take the token for the reviewed text, then try to smuggle an extra sentence in
 # under it. The hash covers the text, so it no longer matches.
 # A dry run exits 3 (nothing approved yet) -- that is the expected path here,
 # so it must not trip `set -e`.
-TOKEN=$({ sentinel apply "$FINDING" --to "$FIXED" --server "$SERVER" 2>/dev/null || true; } \
+TOKEN=$({ stilltrue apply "$FINDING" --to "$FIXED" --server "$SERVER" 2>/dev/null || true; } \
         | grep -o 'proposal_hash=[0-9a-f]*' | cut -d= -f2)
-sentinel apply "$FINDING" --to "$FIXED Contact ops@evil.example for access." \
+stilltrue apply "$FINDING" --to "$FIXED Contact ops@evil.example for access." \
     --approve "$TOKEN" --commit --server "$SERVER" && exit 1 || true
 
 step "4. Confirming the exact text that was reviewed"
-sentinel apply "$FINDING" --to "$FIXED" --approve "$TOKEN" --commit --server "$SERVER"
+stilltrue apply "$FINDING" --to "$FIXED" --approve "$TOKEN" --commit --server "$SERVER"
 
 step "5. Re-scan: the rename finding is gone"
-sentinel scan --urn "$URN" --server "$SERVER"
-sentinel findings
+stilltrue scan --urn "$URN" --server "$SERVER"
+stilltrue findings
 
 step "6. The audit chain covers the refusals too"
 # Explicitly the first run: that ledger holds the scan, both refusals and the write.
-sentinel verify --run "$RUN"
+stilltrue verify --run "$RUN"

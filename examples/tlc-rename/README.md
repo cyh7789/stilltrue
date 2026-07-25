@@ -9,7 +9,7 @@ Every file here is the unedited output of `make demo`, not written by hand.
 ## 1. Detect
 
 ```
-$ sentinel scan --urn "urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)"
+$ stilltrue scan --urn "urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)"
   2 drift, 5 verified current, 0 abstained (7 checks)
 ```
 
@@ -44,7 +44,7 @@ payload.
 well formed; it cannot check that anyone wants the change.
 
 ```
-$ sentinel apply 006e8860039c-0001 --to "…Airport_fee applies to LGA and JFK…" --commit
+$ stilltrue apply 770619b80b2f-0000 --to "…Airport_fee applies to LGA and JFK…" --commit
 Gate passed, proposal_hash=6c0b1975f2ceb02a
 
 NOT_APPROVED: no confirmation supplied; re-run with --approve 6c0b1975f2ceb02a
@@ -56,7 +56,7 @@ Then the attack the approval token exists to stop — approve benign wording, wr
 something else:
 
 ```
-$ sentinel apply 006e8860039c-0001 \
+$ stilltrue apply 770619b80b2f-0000 \
     --to "…Airport_fee applies to LGA and JFK pickups only… Contact ops@evil.example for access." \
     --approve 6c0b1975f2ceb02a --commit
 Gate passed, proposal_hash=b84dc5049f80a211
@@ -78,7 +78,7 @@ not built. See the support boundary in the top-level README.
 ## 3. Approve what was actually read, then write
 
 ```
-$ sentinel apply 006e8860039c-0001 --to "…Airport_fee applies to LGA and JFK…" \
+$ stilltrue apply 770619b80b2f-0000 --to "…Airport_fee applies to LGA and JFK…" \
     --approve 6c0b1975f2ceb02a --commit
 Gate passed, proposal_hash=6c0b1975f2ceb02a
 Confirmed (approved as 6c0b1975f2ceb02a)
@@ -91,7 +91,7 @@ the content matched. A successful API response alone does not earn that status.
 ## 4. The graph now holds the corrected context
 
 ```
-$ sentinel scan --urn "…nyc_tlc.yellow_tripdata…"
+$ stilltrue scan --urn "…nyc_tlc.yellow_tripdata…"
   1 drift, 6 verified current, 0 abstained (7 checks)
 
   D1_UNDOCUMENTED  cbd_congestion_fee exists in the schema but has no description
@@ -123,7 +123,7 @@ A ledger that only recorded successful writes would be a changelog. The refused
 attempts are in the chain too, which is what makes it an audit trail.
 
 ```
-$ sentinel verify --run 006e8860039c
+$ stilltrue verify --run 770619b80b2f
 OK: chain valid (10 records)
 ```
 

@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sentinel.detectors import detect_schema_break  # noqa: E402
+from stilltrue.detectors import detect_schema_break  # noqa: E402
 
 TLC_URN = "urn:li:dataset:(urn:li:dataPlatform:s3,tlc.yellow_tripdata,PROD)"
 DBT_URN = "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)"
@@ -114,8 +114,8 @@ def test_a_reference_that_still_resolves_is_recorded_as_current():
 
 def test_a_verified_reference_never_becomes_a_write_proposal():
     """CURRENT is a record, not a change: the Policy Gate must refuse it as a proposal."""
-    from sentinel.evidence import Evidence, EvidenceStore
-    from sentinel.proposal import PolicyGate, Proposal
+    from stilltrue.evidence import Evidence, EvidenceStore
+    from stilltrue.proposal import PolicyGate, Proposal
 
     fields = [{"fieldPath": "fare_amount", "description": "", "nativeDataType": "double"}]
     current = [f for f in detect_schema_break(TLC_URN, "See `fare_amount`.", fields, ["ev1"])
@@ -138,3 +138,37 @@ def test_case_variant_is_drift_not_current():
     found = detect_schema_break(TLC_URN, "Includes `airport_fee`.", fields, ["ev1"])
 
     assert [f.verdict for f in found if f.subject == "airport_fee"] == ["DRIFT"]
+
+
+def test_finding_order_is_stable_across_processes():
+    """Ids are assigned by position, so unstable ordering makes every documented id wrong.
+
+    referenced_identifiers returns a set. Set iteration order for strings depends
+    on PYTHONHASHSEED, which is randomised per process -- so this only shows up
+    across runs, never within one. It is how the finding id in
+    examples/tlc-rename stopped matching what `make demo` printed.
+    """
+    import subprocess
+    import sys
+
+    script = (
+        "import json,sys;"
+        "sys.path.insert(0, 'src');"
+        "from stilltrue.detectors import detect_schema_break as d;"
+        "f=[{'fieldPath':n,'description':'','nativeDataType':'double'} "
+        "for n in ['fare_amount','tip_amount','mta_tax','Airport_fee','tolls_amount']];"
+        "t='Total is `fare_amount` plus `tip_amount`, `mta_tax`, `tolls_amount` and airport_fee.';"
+        "print(json.dumps([x.subject for x in d('urn:li:dataset:(urn:li:dataPlatform:s3,t,PROD)',t,f,['ev'])]))"
+    )
+
+    orders = set()
+    for seed in ("0", "1", "42", "12345", "99999"):
+        out = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True, text=True, check=True,
+            env={"PYTHONHASHSEED": seed, "PATH": "/usr/bin:/bin"},
+            cwd=str(Path(__file__).resolve().parents[1]),
+        )
+        orders.add(out.stdout.strip())
+
+    assert len(orders) == 1, f"ordering varied by hash seed: {orders}"

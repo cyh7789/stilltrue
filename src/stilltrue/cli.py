@@ -1,4 +1,4 @@
-"""Context Drift Sentinel CLI.
+"""StillTrue CLI.
 
 One subcommand per state transition:
     scan      read DataHub, run deterministic detectors, persist findings + evidence
@@ -45,7 +45,7 @@ def _run_dir(run_id: str) -> Path:
 def _latest_run() -> Path:
     runs = sorted(WORK_DIR.glob("*/"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not runs:
-        raise typer.BadParameter("No scan results found. Run `sentinel scan` first.")
+        raise typer.BadParameter("No scan results found. Run `stilltrue scan` first.")
     return runs[0]
 
 

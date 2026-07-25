@@ -128,7 +128,10 @@ def detect_schema_break(
     ]
 
     for where, text in sources:
-        for ref in referenced_identifiers(text):
+        # sorted, not raw set order: findings are numbered by position, so an
+        # order that shifts with PYTHONHASHSEED makes every finding id printed
+        # in the docs wrong on the reader's machine.
+        for ref in sorted(referenced_identifiers(text)):
             if ref in actual:   # exact match: different case means a different field
                 # Recorded rather than skipped. A report that only lists problems
                 # cannot show how much was checked, and an abstention is only
@@ -267,7 +270,7 @@ def detect_lineage_drift(
 
     upstream_names = {u.lower() for u in upstream_urns}
     findings = []
-    for claimed in {c.lower() for c in claims}:
+    for claimed in sorted({c.lower() for c in claims}):
         if any(claimed in u for u in upstream_names):
             findings.append(
                 Finding(

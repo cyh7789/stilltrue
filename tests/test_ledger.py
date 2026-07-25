@@ -12,8 +12,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sentinel.evidence import canonical_hash  # noqa: E402
-from sentinel.ledger import AuditLedger  # noqa: E402
+from stilltrue.evidence import canonical_hash  # noqa: E402
+from stilltrue.ledger import AuditLedger  # noqa: E402
 
 URN = "urn:li:dataset:(urn:li:dataPlatform:s3,tlc.yellow_tripdata,PROD)"
 

@@ -5,7 +5,7 @@ The unedited output of scanning DataHub's own `showcase-ecommerce` datapack —
 into.
 
 ```
-$ sentinel scan --limit 25
+$ stilltrue scan --limit 25
   3 drift, 0 verified current, 14 abstained (17 checks)
 ```
 
@@ -57,7 +57,7 @@ a failure to reach one.
 
 ## The three drift findings it did report
 
-They are in the same file, filtered with `sentinel findings --verdict DRIFT`.
+They are in the same file, filtered with `stilltrue findings --verdict DRIFT`.
 Each is an undocumented-column case on a table that is itself documented — the
 "documentation stopped keeping up" shape, not a guess about prose.
 
@@ -65,6 +65,6 @@ Each is an undocumented-column case on a table that is itself documented — the
 
 ```bash
 datahub datapack load showcase-ecommerce
-sentinel scan --limit 25
-sentinel findings --verdict INSUFFICIENT_EVIDENCE
+stilltrue scan --limit 25
+stilltrue findings --verdict INSUFFICIENT_EVIDENCE
 ```

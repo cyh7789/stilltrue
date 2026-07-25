@@ -64,7 +64,7 @@ def ours(description: str, fields: list[dict], entity_urn: str) -> list[str]:
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-    from sentinel.detectors import detect_schema_break
+    from stilltrue.detectors import detect_schema_break
 
     found = detect_schema_break(entity_urn, description, fields, ["ev_bench"])
     return [f.subject for f in found if f.verdict == "DRIFT"]
@@ -77,7 +77,7 @@ def evaluate(description: str, fields: list[dict], entity_urn: str,
         "B0 no context": b0_no_context(description, fields),
         "B1 coverage only": b1_coverage_only(description, fields),
         "B2 case-insensitive": b2_case_insensitive(description, fields),
-        "Context Drift Sentinel": ours(description, fields, entity_urn),
+        "StillTrue": ours(description, fields, entity_urn),
     }
     scored = {}
     for name, reported in runs.items():

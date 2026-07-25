@@ -10,8 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sentinel.executor import WriteExecutor  # noqa: E402
-from sentinel.proposal import Proposal  # noqa: E402
+from stilltrue.executor import WriteExecutor  # noqa: E402
+from stilltrue.proposal import Proposal  # noqa: E402
 
 URN = "urn:li:dataset:(urn:li:dataPlatform:s3,tlc.yellow_tripdata,PROD)"
 BEFORE = "Fare breakdown includes airport_fee for LGA/JFK pickups."

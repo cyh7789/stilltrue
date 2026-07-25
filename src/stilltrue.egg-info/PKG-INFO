@@ -1,5 +1,5 @@
 Metadata-Version: 2.4
-Name: context-drift-sentinel
+Name: stilltrue
 Version: 0.1.0
 Summary: Finds DataHub context that has drifted out of sync with reality, proposes fixes with citations, and writes verdicts back to the graph.
 Requires-Python: >=3.11
