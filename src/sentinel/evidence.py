@@ -91,6 +91,25 @@ class EvidenceStore:
     def get(self, evidence_id: str) -> Evidence | None:
         return self._items.get(evidence_id)
 
+    def hydrate(self, rows: list[dict[str, Any]]) -> int:
+        """Reload evidence persisted by an earlier command.
+
+        A proposal produced by `scan` cites ids from that run's store. Without
+        this, `apply` starts with an empty store and the Policy Gate correctly
+        refuses every proposal for citing evidence it cannot see. Ids are
+        content-derived, so a rebuilt record lands on the same id.
+        """
+        loaded = 0
+        for row in rows:
+            self.add(Evidence(
+                entity_urn=row["entity_urn"],
+                source_function=row["source_function"],
+                payload=row["payload"],
+                captured_at=row.get("captured_at", ""),
+            ))
+            loaded += 1
+        return loaded
+
     def resolve_all(self, evidence_ids: list[str]) -> tuple[bool, list[str]]:
         """Check a set of citations. Returns (all_resolved, missing_ids).
 

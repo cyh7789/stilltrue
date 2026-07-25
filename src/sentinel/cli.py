@@ -155,6 +155,13 @@ def apply(
     ledger = AuditLedger(d / LEDGER_FILE)
 
     with ReadOnlyDataHubAdapter(server=server) as adapter:
+        # Reload the evidence this run captured, otherwise the Gate rejects the
+        # proposal for citing ids it cannot resolve -- correctly so.
+        ev_path = d / EVIDENCE_FILE
+        if ev_path.exists():
+            rows = [json.loads(l) for l in ev_path.read_text(encoding="utf-8").splitlines() if l]
+            adapter.evidence.hydrate(rows)
+
         entity, ev = adapter.get_entity(f["entity_urn"])
         before = authored_description(entity)
 
@@ -176,9 +183,14 @@ def apply(
 
     typer.echo(f"Gate passed, proposal_hash={p.proposal_hash[:16]}")
 
-    executor = WriteExecutor(
-        reader=lambda _p: before, server=server, dry_run=not commit
-    )
+    def reread(prop: Proposal) -> str:
+        """Fetch the live value. Must actually hit DataHub, or the read-back
+        check compares the proposal against a stale copy and always fails."""
+        with ReadOnlyDataHubAdapter(server=server) as a:
+            current, _ = a.get_entity(prop.entity_urn)
+            return authored_description(current)
+
+    executor = WriteExecutor(reader=reread, server=server, dry_run=not commit)
     receipt = executor.execute(p, p.proposal_hash)
     ledger.append("execute", d.name, p.entity_urn, receipt.to_dict())
 
