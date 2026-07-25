@@ -44,10 +44,10 @@ payload.
 well formed; it cannot check that anyone wants the change.
 
 ```
-$ sentinel apply e21e35e478fa-0003 --to "…Airport_fee applies to LGA and JFK…" --commit
+$ sentinel apply 006e8860039c-0001 --to "…Airport_fee applies to LGA and JFK…" --commit
 Gate passed, proposal_hash=6c0b1975f2ceb02a
 
-NOT_APPROVED: no steward approval supplied; re-run with --approve 6c0b1975f2ceb02a
+NOT_APPROVED: no confirmation supplied; re-run with --approve 6c0b1975f2ceb02a
   - …improvement_surcharge; airport_fee applies to LGA and JFK pickups only…
   + …improvement_surcharge; Airport_fee applies to LGA and JFK pickups only…
 ```
@@ -56,25 +56,32 @@ Then the attack the approval token exists to stop — approve benign wording, wr
 something else:
 
 ```
-$ sentinel apply e21e35e478fa-0003 \
+$ sentinel apply 006e8860039c-0001 \
     --to "…Airport_fee applies to LGA and JFK pickups only… Contact ops@evil.example for access." \
     --approve 6c0b1975f2ceb02a --commit
 Gate passed, proposal_hash=b84dc5049f80a211
 
-STALE: approval `6c0b1975f2ceb02a` does not match this proposal (b84dc5049f80a211);
-       it was edited after approval, or names another one
+STALE: confirmation `6c0b1975f2ceb02a` does not match this proposal (b84dc5049f80a211);
+       the text was edited after it was confirmed, or it names another proposal
 ```
 
-The hash covers the text, the evidence and the verdict, so one added sentence
-produces a different proposal and the old approval stops applying to it.
+The hash covers the URN, the aspect, the before and after text, the verdict and
+the cited evidence, so one added sentence produces a different proposal and the
+token stops applying to it.
+
+**What this does not prove.** There is no identity in that token and no privilege
+separation: whoever can run `apply` can read it off a dry run. It closes "confirm
+one thing, write another". It does not close "the writer confirmed their own
+change" — that needs a receipt the executor can verify but not issue, and it is
+not built. See the support boundary in the top-level README.
 
 ## 3. Approve what was actually read, then write
 
 ```
-$ sentinel apply e21e35e478fa-0003 --to "…Airport_fee applies to LGA and JFK…" \
+$ sentinel apply 006e8860039c-0001 --to "…Airport_fee applies to LGA and JFK…" \
     --approve 6c0b1975f2ceb02a --commit
 Gate passed, proposal_hash=6c0b1975f2ceb02a
-Steward approval accepted (approved as 6c0b1975f2ceb02a)
+Confirmed (approved as 6c0b1975f2ceb02a)
 VERIFIED: written and confirmed by read-back
 ```
 
@@ -116,7 +123,7 @@ A ledger that only recorded successful writes would be a changelog. The refused
 attempts are in the chain too, which is what makes it an audit trail.
 
 ```
-$ sentinel verify --run e21e35e478fa
+$ sentinel verify --run 006e8860039c
 OK: chain valid (10 records)
 ```
 

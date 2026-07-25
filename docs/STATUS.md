@@ -7,7 +7,8 @@
 ## 1. 題目與賽道
 
 偵測 DataHub 裡「人寫的描述」與「schema／lineage 現實」脫節之處，附證據提出修正，
-經 steward 核准後寫回 graph。投賽道 Agents That Do Real Work。
+操作者在 CLI 明示確認 proposal hash 後寫回 graph。投賽道 Agents That Do Real Work。
+⚠️ **尚未驗證確認者是否為獨立 steward**——無身分、無簽章、無權限分離，見 §2 與 §6.9b。
 
 **範圍已縮**：SPEC §0 原寫「description、glossary term、ownership、文件」四面，
 實作只涵蓋 description × (schema / lineage)。ownership 與文件面未做（見 §6）。
@@ -20,11 +21,11 @@
 | `src/sentinel/evidence.py` | 證據紀錄。欄位：`entity_urn`、`source_function`、`captured_at`、`payload_hash`、`payload`。**`evidence_id` 由「URN + function + payload」內容決定，不含 `captured_at`**——重跑同一觀測產生同一 id，既有引用不會失效；但擷取時間本身有存在紀錄裡（`evidence.py:47` 與 `to_dict()`）。`EvidenceStore` 支援跨命令 hydrate |
 | `src/sentinel/detectors.py` | D1 schema 斷鏈、D1 未文件化欄位、D3 lineage 漂移。全確定性，無 LLM。三態 verdict **皆會產出**：引用解析成功記 CURRENT、有改名候選記 DRIFT、無候選且來自表描述記 INSUFFICIENT_EVIDENCE |
 | `src/sentinel/semantic.py` | D5 語意漂移。確定性預篩 → 注入式判讀器 → 引文閘。模組本身不發網路請求。**未接真實 LLM，未接進 CLI** |
-| `src/sentinel/proposal.py` | Proposal + PolicyGate + `check_approval()`。Gate 擋六類：白名單外 aspect、非 DRIFT verdict、無證據、引用不存在證據、前後相同、清空內容。核准另有一關：`--approve <proposal_hash>`，token 涵蓋文字＋證據＋verdict，改字即 STALE |
+| `src/sentinel/proposal.py` | Proposal + PolicyGate + `check_approval()`。Gate 擋六類：白名單外 aspect、非 DRIFT verdict、無證據、引用不存在證據、前後相同、清空內容。確認另有一關：`--approve <proposal_hash>`。hash 的 canonical payload 為 `{urn, aspect, subject, before, after, verdict, evidence}` 七項全覆蓋，改任一項即 STALE。**這是內容鎖，不是授權邊界**：不帶身分、不帶簽章，能跑 `apply` 的人自己 dry-run 就拿得到 token |
 | `src/sentinel/executor.py` | 寫前重讀（TOCTOU）、冪等鍵、寫後回讀。VERIFY_FAILED 不自動重試 |
 | `src/sentinel/ledger.py` | append-only JSONL，hash 鏈。verify 可抓內容竄改、刪除、順序調換。**被拒絕的嘗試也入鏈**（NOT_APPROVED / STALE） |
 | `src/sentinel/cli.py` | `sentinel scan / findings / apply / verify` |
-| `Makefile` + `scripts/demo.sh` | `make demo`（全閉環含兩次拒絕，可重跑）、`make bench-replay`、`make datahub-up`、`make test` |
+| `Makefile` + `scripts/demo.sh` | `make demo`（全閉環含兩次自動拒寫，可重跑）、`make bench-replay`、`make datahub-up`、`make test` |
 
 ## 3. 實測數字
 
@@ -71,9 +72,13 @@ B2 換成「大小寫不敏感比對」。B2 對事件 1 依構造必然漏掉�
 
 ## 4. 端到端閉環（已實際執行，非 dry-run）
 
-`make demo` 全流程：scan（2 drift、5 current）→ 無核准寫入被擋（NOT_APPROVED）→
-核准 A 文字改寫 B 文字被擋（STALE）→ 正當核准 → 寫回 DataHub → read-back VERIFIED →
-重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT）→ `verify` 鏈有效（10 筆，含兩次拒絕）。
+`make demo` 全流程：scan（2 drift、5 current）→ 無 token 寫入遭**自動拒寫**（NOT_APPROVED）→
+拿 A 文字的 token 改寫 B 文字遭**自動拒寫**（STALE）→ 正當確認 → 寫回 DataHub →
+read-back VERIFIED → 重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT）→
+`verify` 鏈有效（10 筆，含兩次拒寫）。
+
+⚠️ 兩次都是**系統依規則自動拒絕**，不是人主動 reject。**steward 主動否決的路徑沒有端到端實測**，
+`CONFLICT`、重複套用回原收據、`VERIFY_FAILED` 三條失敗路徑也沒有（見 §6.18）。
 
 未編輯輸出：`examples/tlc-rename/`。
 
@@ -97,6 +102,7 @@ B2 換成「大小寫不敏感比對」。B2 對事件 1 依構造必然漏掉�
 7. **SQLite State Store、排程器** — 不存在。現況是單發 CLI，不是「持續」執行
 8. **Steward Review UI** — 不存在。核准是 CLI 的 `--approve <hash>`，非圖形介面
 9. **程序級讀寫憑證分離未證實** — adapter 沒 import 寫入工具、executor 是獨立模組，但**沒有兩個程序、兩份憑證的實作**。SPEC §1 採 codex 架構的核心理由（唯一做到程序層級隔離）目前不成立
+9b. **核准的授權邊界未做** — `--approve` 只證明呼叫者持有該內容的 token，不證明是誰確認、何時確認、確認權是否與寫入權分離。要成立需要「executor 可驗證但不可簽發」的核准收據（綁完整 canonical payload + 確認者身分 + 時間），並在 ledger 分別記錄 proposer／approver／executor
 10. **完整指標面** — 只報 recall／誤報／verify 鏈。citation validity、unsupported-claim rate、abstention rate、gate escape、duplicate mutation 等無數字
 
 **提交物：**
@@ -110,7 +116,8 @@ B2 換成「大小寫不敏感比對」。B2 對事件 1 依構造必然漏掉�
 **已知失真：**
 
 16. `mine_drift_labels.py` 對 mart 模型的 schema 重建不完整
-17. 審計鏈末筆無外部錨點——同時改末筆並重算其 hash 的攻擊，`verify` 抓不到
+17. 審計鏈末筆無外部錨點——同時改末筆並重算其 hash 的攻擊，`verify` 抓不到。是 tamper-evident，不是 tamper-proof
+18. 失敗路徑缺端到端實測：steward 主動 reject、`CONFLICT`（寫前重讀發現值已變）、重複套用回傳原收據、`VERIFY_FAILED`。四條都有程式碼，都沒有實跑紀錄
 
 ## 7. 開發過程中修正的判斷
 

@@ -6,9 +6,9 @@ does not judge whether the proposal reads convincingly; it only checks
 mechanically verifiable conditions. Any violation stops the proposal here.
 
 What the gate deliberately does not cover — whether the new wording is
-semantically correct — belongs to the steward's approval step. Keeping the
-layers distinct is what stops this from becoming a pile of gates that look
-impressive and block nothing.
+semantically correct — is left to the person reading the diff before
+confirming it. Keeping the layers distinct is what stops this from becoming a
+pile of gates that look impressive and block nothing.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ class Proposal:
 
     @property
     def proposal_hash(self) -> str:
-        """Approvals bind to this value, so editing a proposal voids its approval."""
+        """Confirmations bind to this value, so editing a proposal voids its token."""
         return canonical_hash({
             "urn": self.entity_urn, "aspect": self.aspect, "subject": self.subject,
             "before": self.before_value, "after": self.after_value,
@@ -87,27 +87,34 @@ class ApprovalDecision:
 
 
 def check_approval(p: Proposal, approval: str | None) -> ApprovalDecision:
-    """Second lock, after the Policy Gate: did a human approve *this* proposal?
+    """Second lock, after the Policy Gate: is the write bound to a reviewed text?
 
     The gate checks a proposal is well formed. It cannot check anyone wants the
-    change — that judgement is the steward's, and it is made against text they
-    read. Binding the approval to `proposal_hash` is what makes "approve the
-    benign version, then write something else" impossible: the text, the
-    evidence and the verdict all feed the hash, so any edit produces a token
-    that no longer matches.
+    change. Binding the confirmation to `proposal_hash` — which covers the URN,
+    the aspect, the subject, the before and after text, the verdict and the
+    cited evidence — makes "approve the benign version, then write something
+    else" fail closed: any edit produces a token that no longer matches.
+
+    **What this is not.** There is no identity here and no privilege boundary.
+    The check proves the caller holds a token for exactly this content; it does
+    not prove a separate steward reviewed it, and whoever can run `apply` can
+    obtain the token from a dry run. Enforcing *who* may approve needs an
+    approval receipt the executor can verify but not issue — see
+    docs/STATUS.md. Until that exists, call this an operator confirmation, not
+    a steward approval.
     """
     if not approval:
         return ApprovalDecision(
             False, "NOT_APPROVED",
-            f"no steward approval supplied; re-run with --approve {p.proposal_hash[:MIN_APPROVAL_PREFIX]}",
+            f"no confirmation supplied; re-run with --approve {p.proposal_hash[:MIN_APPROVAL_PREFIX]}",
         )
 
     token = approval.strip().lower()
     if len(token) < MIN_APPROVAL_PREFIX or not p.proposal_hash.startswith(token):
         return ApprovalDecision(
             False, "STALE",
-            f"approval `{approval}` does not match this proposal "
-            f"({p.proposal_hash[:MIN_APPROVAL_PREFIX]}); it was edited after approval, or names another one",
+            f"confirmation `{approval}` does not match this proposal "
+            f"({p.proposal_hash[:MIN_APPROVAL_PREFIX]}); the text was edited after it was confirmed, or it names another proposal",
         )
 
     return ApprovalDecision(True, "APPROVED", f"approved as {token}")

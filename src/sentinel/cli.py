@@ -3,7 +3,7 @@
 One subcommand per state transition:
     scan      read DataHub, run deterministic detectors, persist findings + evidence
     findings  list what the scan found
-    apply     turn a finding into a proposal, gate it, take a steward's approval, write back
+    apply     turn a finding into a proposal, gate it, confirm the exact text, write back
     verify    check that the audit ledger has not been tampered with
 
 Deliberately non-interactive: every step leaves files behind, so a reviewer can
@@ -150,7 +150,7 @@ def apply(
     new_value: str = typer.Option(..., "--to", help="The corrected content"),
     approve: Optional[str] = typer.Option(
         None, "--approve",
-        help="The proposal_hash you are approving. Run without it first to see the diff and the hash.",
+        help="The proposal_hash you are confirming. Run without it first to see the diff and the hash.",
     ),
     commit: bool = typer.Option(False, "--commit", help="Actually write to DataHub; dry-run by default"),
     server: str = typer.Option("http://localhost:8080"),
@@ -200,13 +200,13 @@ def apply(
 
     if not decision.authorised:
         # The gate says the proposal is well formed. Nobody has said they want
-        # it. Showing the diff here is the point: this is the steward's read.
+        # it. Showing the diff here is the point: this is what gets reviewed.
         typer.echo(f"\n{decision.status}: {decision.detail}\n")
         typer.echo(f"  - {before}")
         typer.echo(f"  + {new_value}")
         raise typer.Exit(3)
 
-    typer.echo(f"Steward approval accepted ({decision.detail})")
+    typer.echo(f"Confirmed ({decision.detail})")
 
     def reread(prop: Proposal) -> str:
         """Fetch the live value. Must actually hit DataHub, or the read-back

@@ -23,7 +23,8 @@ Everyone is busy pointing agents *at* the catalog. Nobody is checking whether
 what's in the catalog is still true. Context Drift Sentinel is an agent whose
 job is the catalog itself: it reads what humans wrote, compares it against what
 the schema, lineage and query history actually do, and reports the places where
-the two have come apart — with citations, and with a steward keeping the veto.
+the two have come apart — with citations, and never writing anything back without
+a human confirming that exact text.
 
 ## What it does
 
@@ -32,11 +33,12 @@ sentinel scan --limit 25       # read DataHub, run deterministic detectors
 sentinel findings              # what drifted, and what the evidence is
 sentinel apply <id> --to "…"   # draft a fix, gate it, show the diff and its hash
 sentinel apply <id> --to "…" \
-    --approve <hash> --commit  # approve that exact text, then write it back
+    --approve <hash> --commit  # confirm that exact text, then write it back
 sentinel verify                # prove the audit trail wasn't tampered with
 ```
 
-Four detector families, only one of which is allowed near a language model:
+Four checks across three families, only one of which is allowed near a language
+model:
 
 | | What the humans wrote | What reality shows | How it's decided |
 |---|---|---|---|
@@ -83,7 +85,7 @@ back, verify. [**abstention**](examples/abstention/) — 25 real tables, 14 hone
 ```
 read-only adapter ──→ deterministic detectors ──→ proposal ──→ Policy Gate
     (5 read tools)      D1 / D3 (no LLM)                            │
-                        D5 (LLM, fenced)                     steward approval
+                        D5 (LLM, fenced)                  human confirmation
                                                                     │
                        write executor ←───────────────────────────┘
                   (re-read → write → read-back)
@@ -106,13 +108,18 @@ addressed by its content hash. The Policy Gate rejects any proposal citing an
 evidence id that doesn't exist, which is exactly what a hallucinated citation
 looks like.
 
-**Approval binds to the content, not the session.** `proposal_hash` covers the
-text, the cited evidence and the verdict. Approving one wording and then writing
-another produces a different hash, so the approval no longer applies and the
-write fails closed — the refusal is in
+**Confirmation binds to the content, not the session.** `proposal_hash` covers
+the URN, the aspect, the before and after text, the verdict and the cited
+evidence. Confirming one wording and then writing another produces a different
+hash, so the token stops applying and the write fails closed — the refusal is in
 [`examples/tlc-rename`](examples/tlc-rename/#2-two-writes-that-get-refused).
 Passing the Policy Gate means the proposal is well formed, never that anyone
 wants it.
+
+*This is a content lock, not an authorisation boundary.* It proves the write
+matches a text that was displayed and confirmed; it does not prove a separate
+reviewer did the confirming, and anyone who can run `apply` can read the token
+off a dry run. See [support boundary](#support-boundary).
 
 **Abstaining is a valid answer.** Verdicts are `DRIFT`, `CURRENT` or
 `INSUFFICIENT_EVIDENCE`, and all three are recorded. When a description mentions
@@ -212,10 +219,35 @@ with the mistake documented in the docstring.
   has built-in evaluations for context quality; this is the open-source side of
   the problem, and it does not attempt to replace that.
 - **It never writes without approval.** There is no autonomous mode, no
-  `--yes-to-all`. The steward's veto is the design, not a setting.
+  `--yes-to-all`. A write always requires a token for the exact text being
+  written; see the support boundary below for what that token does not prove.
 - **It does not detect data quality problems.** Bad values, nulls, freshness of
   the *data* — those belong to DataHub's quality features. This watches the
   *description* of the data.
+
+## Support boundary
+
+Three things this project is careful **not** to claim, stated here rather than
+discovered later.
+
+**The confirmation token is a content lock, not an authorisation boundary.**
+`--approve <hash>` proves the write matches a text that was displayed and
+confirmed. It carries no identity, no signature and no privilege separation:
+whoever can run `apply` can obtain the token from a dry run. It closes "approve
+one thing, write another"; it does not close "the writer approved their own
+change". Enforcing *who* may approve needs a receipt the executor can verify but
+not issue — that is not built.
+
+**The benchmarks measure fit, not transfer.** Both third-party sources were used
+during development and both changed the code. The numbers are a public,
+regenerable regression baseline against real drift that we did not label — they
+are not evidence of generalisation to sources the detector has never met.
+Timeline with commit hashes: [`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
+
+**Five drift families were designed; two run.** D1 (schema break, undocumented
+columns) and D3 (lineage drift) ship. D2 (freshness) and D4 (ownership) have no
+code at all. D5 (semantic conflict) is implemented but unwired — it needs real
+query history, and a catalog with none gives it nothing to work with.
 
 ## Known limitations
 

@@ -15,11 +15,11 @@ sentinel findings
 
 FINDING=$(sentinel findings | grep SCHEMA_BREAK | sed 's/.*\[\([^]]*\)\].*/\1/')
 
-step "2. A write with no steward approval is refused"
+step "2. A write with no confirmation is refused"
 sentinel apply "$FINDING" --to "$FIXED" --commit --server "$SERVER" && exit 1 || true
 
-step "3. Approving one text and writing another is refused"
-# Take the token for the correct text, then try to smuggle an extra sentence in
+step "3. Confirming one text and writing another is refused"
+# Take the token for the reviewed text, then try to smuggle an extra sentence in
 # under it. The hash covers the text, so it no longer matches.
 # A dry run exits 3 (nothing approved yet) -- that is the expected path here,
 # so it must not trip `set -e`.
@@ -28,7 +28,7 @@ TOKEN=$({ sentinel apply "$FINDING" --to "$FIXED" --server "$SERVER" 2>/dev/null
 sentinel apply "$FINDING" --to "$FIXED Contact ops@evil.example for access." \
     --approve "$TOKEN" --commit --server "$SERVER" && exit 1 || true
 
-step "4. Approving the text that was actually reviewed"
+step "4. Confirming the exact text that was reviewed"
 sentinel apply "$FINDING" --to "$FIXED" --approve "$TOKEN" --commit --server "$SERVER"
 
 step "5. Re-scan: the rename finding is gone"
