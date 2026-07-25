@@ -141,15 +141,25 @@ def detect_schema_break(
                 # A case/underscore variant exists: strong signal (TLC case)
                 verdict, confidence = "DRIFT", "high"
                 reality = f"the schema has no `{ref}`, but it does have `{candidate}`"
+            elif where != "dataset description":
+                # The reference came from a *field* description. That context is
+                # narrow: when a column's own documentation names another
+                # snake_case identifier, it is almost always a sibling column
+                # (surrogate keys list their components, derived fields name
+                # their inputs). A table description is prose and cites other
+                # tables, entity types and placeholders; a field description
+                # rarely does. Measured on fivetran/dbt_shopify: 9 of 10
+                # identifier-change positives live here.
+                verdict, confidence = "DRIFT", "medium"
+                reality = f"the schema has no `{ref}` (it has {len(actual)} fields)"
             else:
-                # No near-match to point at. Real descriptions are prose: they
-                # cite other tables, DataHub entity types, and placeholders like
-                # `table_name`. On real data, calling every unresolved token
-                # drift produced far more noise than signal, so anything without
-                # a rename candidate abstains, backticked or not.
-                # The cost: a genuinely deleted column reads as abstention
-                # rather than drift. That trade is deliberate -- a report nobody
-                # trusts is worth less than one that knows when to stay quiet.
+                # A table description with no near-match to point at. Real ones
+                # are prose: they cite other tables, DataHub entity types, and
+                # placeholders like `table_name`. Calling every unresolved token
+                # drift produced far more noise than signal on real data.
+                # The cost: a genuinely deleted column named only in the table
+                # description reads as abstention. That trade is deliberate --
+                # a report nobody trusts is worth less than one that stays quiet.
                 verdict, confidence = "INSUFFICIENT_EVIDENCE", "medium"
                 reality = f"the text mentions `{ref}`, which is not a field here and has no close match"
 

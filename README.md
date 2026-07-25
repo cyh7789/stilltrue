@@ -115,10 +115,18 @@ similarly named replacement, now reads as abstention rather than drift.
 
 Two holdouts, neither of them labelled by us:
 
-| Holdout | Tests | Positives | Where the labels come from |
+| Holdout | Tests | Result | Where the labels come from |
 |---|---|---|---|
-| [`fivetran/dbt_shopify`](https://github.com/fivetran/dbt_shopify) | docs vs code | 40 (Tier A) | the upstream project's own documentation-fix commits |
-| NYC TLC trip records | docs vs data | 2 | the diff between two published parquet schemas |
+| NYC TLC trip records | docs vs data | **2/2**, 0 false positives | the diff between two published parquet schemas |
+| [`fivetran/dbt_shopify`](https://github.com/fivetran/dbt_shopify) | docs vs code | **9/10** on identifier changes | the upstream project's own documentation-fix commits |
+
+The dbt_shopify number is deliberately split by category
+([`bench/SHOPIFY-REPORT.md`](bench/SHOPIFY-REPORT.md)). This detector compares
+identifiers named in prose against the schema, so it addresses identifier
+changes (9/10) and structurally cannot address deprecation notices — 17 of those
+30 positives name no identifier at all. Folding both into one denominator would
+understate the detector on the problem it solves and overstate it on the one it
+does not.
 
 The dbt_shopify miner walks 428 commits looking for pairs: a commit that changed
 a model's SQL without touching the matching description, and the later commit
