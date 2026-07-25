@@ -3,11 +3,14 @@
 One subcommand per state transition:
     scan      read DataHub, run deterministic detectors, persist findings + evidence
     findings  list what the scan found
-    apply     turn a finding into a proposal, run it through the Policy Gate, write back
+    apply     turn a finding into a proposal, gate it, take a steward's approval, write back
     verify    check that the audit ledger has not been tampered with
 
 Deliberately non-interactive: every step leaves files behind, so a reviewer can
-open them directly and the whole flow can be scripted end to end.
+open them directly and the whole flow can be scripted end to end. Approval is a
+`--approve <proposal_hash>` argument rather than a y/n prompt for the same
+reason — and because a token bound to the content is what makes editing the
+text after approval fail closed. A prompt would just ask again.
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from .adapter import ReadOnlyDataHubAdapter, authored_description
 from .detectors import detect_lineage_drift, detect_schema_break
 from .executor import WriteExecutor
 from .ledger import AuditLedger
-from .proposal import PolicyGate, Proposal
+from .proposal import PolicyGate, Proposal, check_approval
 
 app = typer.Typer(add_completion=False, help="Find DataHub context that has drifted out of sync with reality.")
 
@@ -105,8 +108,12 @@ def scan(
             row = f.to_dict() | {"finding_id": f"{run_id}-{i:04d}"}
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    drift = [f for f in findings if f.verdict == "DRIFT"]
-    typer.echo(f"  {len(findings)} findings ({len(drift)} drift, {len(findings) - len(drift)} abstained)")
+    tally = {v: sum(1 for f in findings if f.verdict == v)
+             for v in ("DRIFT", "CURRENT", "INSUFFICIENT_EVIDENCE")}
+    typer.echo(
+        f"  {tally['DRIFT']} drift, {tally['CURRENT']} verified current, "
+        f"{tally['INSUFFICIENT_EVIDENCE']} abstained ({len(findings)} checks)"
+    )
     typer.echo(f"  -> {out}")
 
 
@@ -141,6 +148,10 @@ def verify(run: Optional[str] = typer.Option(None, help="Run id; defaults to the
 def apply(
     finding_id: str = typer.Argument(..., help="Which finding to act on"),
     new_value: str = typer.Option(..., "--to", help="The corrected content"),
+    approve: Optional[str] = typer.Option(
+        None, "--approve",
+        help="The proposal_hash you are approving. Run without it first to see the diff and the hash.",
+    ),
     commit: bool = typer.Option(False, "--commit", help="Actually write to DataHub; dry-run by default"),
     server: str = typer.Option("http://localhost:8080"),
 ) -> None:
@@ -182,6 +193,20 @@ def apply(
         raise typer.Exit(2)
 
     typer.echo(f"Gate passed, proposal_hash={p.proposal_hash[:16]}")
+
+    decision = check_approval(p, approve)
+    ledger.append("approve", d.name, p.entity_urn,
+                  {"proposal_hash": p.proposal_hash, "status": decision.status})
+
+    if not decision.authorised:
+        # The gate says the proposal is well formed. Nobody has said they want
+        # it. Showing the diff here is the point: this is the steward's read.
+        typer.echo(f"\n{decision.status}: {decision.detail}\n")
+        typer.echo(f"  - {before}")
+        typer.echo(f"  + {new_value}")
+        raise typer.Exit(3)
+
+    typer.echo(f"Steward approval accepted ({decision.detail})")
 
     def reread(prop: Proposal) -> str:
         """Fetch the live value. Must actually hit DataHub, or the read-back

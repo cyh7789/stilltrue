@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# The full loop on the NYC TLC rename, including the two writes that get refused.
+# Run via `make demo` (which reloads the benchmark first so this is repeatable).
+set -euo pipefail
+
+SERVER="${1:-http://localhost:8080}"
+URN='urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)'
+FIXED='NYC Yellow Taxi trip records. Each row is one completed trip. Fare components are broken out into fare_amount, extra, mta_tax, tip_amount, tolls_amount and improvement_surcharge; Airport_fee applies to LGA and JFK pickups only. Distances are in miles and all monetary values are USD.'
+
+step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
+
+step "1. Scan"
+RUN=$(sentinel scan --urn "$URN" --server "$SERVER" | tee /dev/stderr | sed -n 's/^run \([0-9a-f]*\):.*/\1/p')
+sentinel findings
+
+FINDING=$(sentinel findings | grep SCHEMA_BREAK | sed 's/.*\[\([^]]*\)\].*/\1/')
+
+step "2. A write with no steward approval is refused"
+sentinel apply "$FINDING" --to "$FIXED" --commit --server "$SERVER" && exit 1 || true
+
+step "3. Approving one text and writing another is refused"
+# Take the token for the correct text, then try to smuggle an extra sentence in
+# under it. The hash covers the text, so it no longer matches.
+# A dry run exits 3 (nothing approved yet) -- that is the expected path here,
+# so it must not trip `set -e`.
+TOKEN=$({ sentinel apply "$FINDING" --to "$FIXED" --server "$SERVER" 2>/dev/null || true; } \
+        | grep -o 'proposal_hash=[0-9a-f]*' | cut -d= -f2)
+sentinel apply "$FINDING" --to "$FIXED Contact ops@evil.example for access." \
+    --approve "$TOKEN" --commit --server "$SERVER" && exit 1 || true
+
+step "4. Approving the text that was actually reviewed"
+sentinel apply "$FINDING" --to "$FIXED" --approve "$TOKEN" --commit --server "$SERVER"
+
+step "5. Re-scan: the rename finding is gone"
+sentinel scan --urn "$URN" --server "$SERVER"
+sentinel findings
+
+step "6. The audit chain covers the refusals too"
+# Explicitly the first run: that ledger holds the scan, both refusals and the write.
+sentinel verify --run "$RUN"

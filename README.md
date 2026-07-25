@@ -28,10 +28,12 @@ the two have come apart — with citations, and with a steward keeping the veto.
 ## What it does
 
 ```bash
-sentinel scan --limit 25      # read DataHub, run deterministic detectors
-sentinel findings             # what drifted, and what the evidence is
-sentinel apply <id> --to "…"  # propose a fix, run the Policy Gate, write back
-sentinel verify               # prove the audit trail wasn't tampered with
+sentinel scan --limit 25       # read DataHub, run deterministic detectors
+sentinel findings              # what drifted, and what the evidence is
+sentinel apply <id> --to "…"   # draft a fix, gate it, show the diff and its hash
+sentinel apply <id> --to "…" \
+    --approve <hash> --commit  # approve that exact text, then write it back
+sentinel verify                # prove the audit trail wasn't tampered with
 ```
 
 Four detector families, only one of which is allowed near a language model:
@@ -57,19 +59,24 @@ there is no code for them. What ships is D1, D3 and an unwired D5.
 ## Quickstart
 
 ```bash
-# 1. A DataHub with data in it
-pip install acryl-datahub
-datahub docker quickstart
-datahub init
-datahub datapack load showcase-ecommerce
-
-# 2. This tool
 pip install -e .
+make datahub-up        # datahub docker quickstart
+make demo              # the whole loop on a real drift event, refusals included
+```
 
-# 3. Look for drift
+`make bench-replay` regenerates every number in this README. To point it at your
+own catalog instead:
+
+```bash
+datahub datapack load showcase-ecommerce
 sentinel scan --limit 25
 sentinel findings
 ```
+
+Two worked examples, both unedited command output:
+[**tlc-rename**](examples/tlc-rename/) — detect, refuse two writes, approve, write
+back, verify. [**abstention**](examples/abstention/) — 25 real tables, 14 honest
+"I don't know"s, zero false drift.
 
 ## Design: the model proposes, the code decides
 
@@ -99,9 +106,20 @@ addressed by its content hash. The Policy Gate rejects any proposal citing an
 evidence id that doesn't exist, which is exactly what a hallucinated citation
 looks like.
 
+**Approval binds to the content, not the session.** `proposal_hash` covers the
+text, the cited evidence and the verdict. Approving one wording and then writing
+another produces a different hash, so the approval no longer applies and the
+write fails closed — the refusal is in
+[`examples/tlc-rename`](examples/tlc-rename/#2-two-writes-that-get-refused).
+Passing the Policy Gate means the proposal is well formed, never that anyone
+wants it.
+
 **Abstaining is a valid answer.** Verdicts are `DRIFT`, `CURRENT` or
-`INSUFFICIENT_EVIDENCE`. When a description mentions an identifier that is not a
-field and has no near-match, the honest output is "I don't know", not a guess.
+`INSUFFICIENT_EVIDENCE`, and all three are recorded. When a description mentions
+an identifier that is not a field and has no near-match, the honest output is "I
+don't know", not a guess. Recording the references that *did* resolve is what
+lets a scan say how much it checked: `2 drift, 5 verified current, 0 abstained`
+is a different claim from `2 findings`.
 
 That decision is what makes the numbers hold up. Real descriptions are prose:
 they cite other tables, DataHub entity types, placeholders like `table_name`.

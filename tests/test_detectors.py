@@ -46,10 +46,18 @@ def test_tlc_new_undocumented_column_is_detected():
     assert found[0].category == "D1_UNDOCUMENTED"
 
 
-def test_consistent_description_produces_nothing():
-    """A description consistent with reality must produce no output -- one false positive ruins the credibility of the whole report."""
+def test_consistent_description_raises_no_problem():
+    """A description consistent with reality must raise nothing -- one false positive ruins the credibility of the whole report.
+
+    It is not silent: the resolved reference is recorded as CURRENT, which is
+    what lets the report say how much it checked. What it must never do is
+    report a problem.
+    """
     fields = [{"fieldPath": "trip_distance", "description": "Elapsed trip distance in miles", "nativeDataType": "double"}]
-    assert detect_schema_break(TLC_URN, "Records include trip_distance per ride.", fields, ["ev3"]) == []
+    found = detect_schema_break(TLC_URN, "Records include trip_distance per ride.", fields, ["ev3"])
+
+    assert [f.verdict for f in found] == ["CURRENT"]
+    assert not [f for f in found if f.verdict in ("DRIFT", "INSUFFICIENT_EVIDENCE")]
 
 
 def test_self_table_name_is_not_a_field_reference():
@@ -82,3 +90,51 @@ def test_unknown_bare_identifier_abstains_instead_of_reporting():
 
     assert _drift(findings) == []
     assert [f.verdict for f in findings] == ["INSUFFICIENT_EVIDENCE"]
+
+
+# --- CURRENT: the third verdict ---------------------------------------------
+# A detector that only ever speaks up about problems cannot say how much it
+# checked. "11 of 12 references still resolve" is what makes the twelfth
+# believable; silence on the eleven is indistinguishable from not looking.
+
+
+def test_a_reference_that_still_resolves_is_recorded_as_current():
+    fields = [
+        {"fieldPath": "fare_amount", "description": "", "nativeDataType": "double"},
+        {"fieldPath": "tip_amount", "description": "", "nativeDataType": "double"},
+    ]
+    found = detect_schema_break(
+        TLC_URN, "Total is `fare_amount` plus `tip_amount`.", fields, ["ev1"]
+    )
+    current = [f for f in found if f.verdict == "CURRENT"]
+
+    assert {f.subject for f in current} == {"fare_amount", "tip_amount"}
+    assert not [f for f in found if f.verdict == "DRIFT" and f.category == "D1_SCHEMA_BREAK"]
+
+
+def test_a_verified_reference_never_becomes_a_write_proposal():
+    """CURRENT is a record, not a change: the Policy Gate must refuse it as a proposal."""
+    from sentinel.evidence import Evidence, EvidenceStore
+    from sentinel.proposal import PolicyGate, Proposal
+
+    fields = [{"fieldPath": "fare_amount", "description": "", "nativeDataType": "double"}]
+    current = [f for f in detect_schema_break(TLC_URN, "See `fare_amount`.", fields, ["ev1"])
+               if f.verdict == "CURRENT"][0]
+
+    store = EvidenceStore()
+    ev = store.add(Evidence(entity_urn=TLC_URN, source_function="list_schema_fields", payload={"fields": fields}))
+    result = PolicyGate(store).check(Proposal(
+        entity_urn=TLC_URN, aspect="dataset_description", verdict=current.verdict,
+        subject=current.subject, before_value="See `fare_amount`.", after_value="See `fare_amount` (checked).",
+        rationale=current.reality, evidence_ids=[ev],
+    ))
+
+    assert not result.passed
+
+
+def test_case_variant_is_drift_not_current():
+    """The TLC event must not be swallowed by the new CURRENT path."""
+    fields = [{"fieldPath": "Airport_fee", "description": "", "nativeDataType": "double"}]
+    found = detect_schema_break(TLC_URN, "Includes `airport_fee`.", fields, ["ev1"])
+
+    assert [f.verdict for f in found if f.subject == "airport_fee"] == ["DRIFT"]

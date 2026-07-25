@@ -130,6 +130,20 @@ def detect_schema_break(
     for where, text in sources:
         for ref in referenced_identifiers(text):
             if ref in actual:   # exact match: different case means a different field
+                # Recorded rather than skipped. A report that only lists problems
+                # cannot show how much was checked, and an abstention is only
+                # believable next to the references that did resolve.
+                findings.append(
+                    Finding(
+                        entity_urn=entity_urn,
+                        category="D1_SCHEMA_BREAK",
+                        verdict="CURRENT",
+                        subject=ref,
+                        claim=f"{where} references `{ref}`",
+                        reality=f"`{ref}` is still a field on this dataset",
+                        evidence_ids=list(evidence_ids),
+                    )
+                )
                 continue
             if ref in self_tokens or ref.lower() in self_tokens:
                 continue        # refers to the table itself or its database/schema
@@ -255,6 +269,17 @@ def detect_lineage_drift(
     findings = []
     for claimed in {c.lower() for c in claims}:
         if any(claimed in u for u in upstream_names):
+            findings.append(
+                Finding(
+                    entity_urn=entity_urn,
+                    category="D3_LINEAGE_DRIFT",
+                    verdict="CURRENT",
+                    subject=claimed,
+                    claim=f"the description claims the data comes from `{claimed}`",
+                    reality=f"`{claimed}` is among the {len(upstream_urns)} actual upstreams",
+                    evidence_ids=list(evidence_ids),
+                )
+            )
             continue
         findings.append(
             Finding(

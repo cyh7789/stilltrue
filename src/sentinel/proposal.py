@@ -72,6 +72,47 @@ class GateResult:
     violations: list[str] = field(default_factory=list)
 
 
+ApprovalStatus = Literal["APPROVED", "NOT_APPROVED", "STALE"]
+
+# The CLI prints proposal_hash[:16]; approving with what was printed has to
+# work. Shorter than that stops identifying a specific proposal.
+MIN_APPROVAL_PREFIX = 16
+
+
+@dataclass
+class ApprovalDecision:
+    authorised: bool
+    status: ApprovalStatus
+    detail: str
+
+
+def check_approval(p: Proposal, approval: str | None) -> ApprovalDecision:
+    """Second lock, after the Policy Gate: did a human approve *this* proposal?
+
+    The gate checks a proposal is well formed. It cannot check anyone wants the
+    change — that judgement is the steward's, and it is made against text they
+    read. Binding the approval to `proposal_hash` is what makes "approve the
+    benign version, then write something else" impossible: the text, the
+    evidence and the verdict all feed the hash, so any edit produces a token
+    that no longer matches.
+    """
+    if not approval:
+        return ApprovalDecision(
+            False, "NOT_APPROVED",
+            f"no steward approval supplied; re-run with --approve {p.proposal_hash[:MIN_APPROVAL_PREFIX]}",
+        )
+
+    token = approval.strip().lower()
+    if len(token) < MIN_APPROVAL_PREFIX or not p.proposal_hash.startswith(token):
+        return ApprovalDecision(
+            False, "STALE",
+            f"approval `{approval}` does not match this proposal "
+            f"({p.proposal_hash[:MIN_APPROVAL_PREFIX]}); it was edited after approval, or names another one",
+        )
+
+    return ApprovalDecision(True, "APPROVED", f"approved as {token}")
+
+
 class PolicyGate:
     """Whether a proposal may enter the review queue is decided by these rules alone."""
 
