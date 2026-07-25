@@ -131,6 +131,29 @@ for what was filtered out and why we stopped filtering.
 The TLC holdout needs no human labelling at all: run `bench/oracles/scan_tlc.py`
 and the two events fall out of the published schemas.
 
+### Does this actually need a context platform?
+
+Same holdout, same inputs, four approaches ([`bench/REPORT.md`](bench/REPORT.md),
+regenerate with `python3 bench/run_bench.py`):
+
+| Baseline | Recall | False positives | Missed |
+|---|---|---|---|
+| B0 — no context, prose only | 0/2 | 0 | both |
+| B1 — coverage only (what DataHub already shows) | 1/2 | 0 | the rename |
+| B2 — prose vs schema, case-insensitive | 0/2 | 0 | both |
+| **Context Drift Sentinel** | **2/2** | **0** | — |
+
+**B1** is the honest one to beat: DataHub's documentation-coverage view already
+tells you which fields lack a description, and it finds the undocumented column.
+What it structurally cannot find is a description that is present and wrong,
+because it never reads the description.
+
+**B2** is not a strawman. Lowercasing both sides is what most people write
+first, and it erases exactly the difference that constitutes a case-only rename.
+It is also the bug this project shipped in its own first version — the TLC
+regression test is what caught it, and it is still in `tests/test_detectors.py`
+with the mistake documented in the docstring.
+
 ## What this does not do
 
 - **It does not judge whether your documentation is well written.** Only whether
