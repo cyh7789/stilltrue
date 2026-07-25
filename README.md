@@ -153,7 +153,7 @@ Two third-party benchmarks, neither of them labelled by us:
 | Benchmark | Tests | Result | Where the labels come from |
 |---|---|---|---|
 | NYC TLC trip records | docs vs data | **2/2**, 0 false positives | the diff between two published parquet schemas |
-| [`fivetran/dbt_shopify`](https://github.com/fivetran/dbt_shopify) | docs vs code | **9/10** on identifier changes | the upstream project's own documentation-fix commits |
+| [`fivetran/dbt_shopify`](https://github.com/fivetran/dbt_shopify) | docs vs code | **9/10** on identifier changes, **4.5%** false positives on 1,933 negatives | the upstream project's own documentation-fix commits |
 
 **These are benchmarks, not holdouts, and the difference matters.** Both were run
 during development and both changed the code: the TLC scan returning nothing is
@@ -164,7 +164,18 @@ the frozen-holdout claim we withdrew — is in
 [`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
 
 What survives the correction: the labels are still not ours, the denominators are
-still public, and the bad numbers are still reported.
+still public, and the bad numbers are still reported — including the 4.5%, which
+was unmeasured until an external reviewer pointed out that publishing recall
+without precision states a claim nobody wrote down.
+
+**The two false-positive numbers differ for a reason.** Zero on 25
+`showcase-ecommerce` tables, 4.5% on 1,933 dbt_shopify columns. The first corpus
+is table descriptions, where an unresolved token abstains; the second is *field*
+descriptions, where the detector asserts drift because on this data 9 of 10 real
+identifier changes live there. The cost is descriptions that enumerate values —
+`in_transit`, `fixed_amount`, `` `AND` `` — which look exactly like column names.
+Same rule, opposite face. Both numbers are in
+[`bench/SHOPIFY-REPORT.md`](bench/SHOPIFY-REPORT.md).
 
 The dbt_shopify number is deliberately split by category
 ([`bench/SHOPIFY-REPORT.md`](bench/SHOPIFY-REPORT.md)). This detector compares

@@ -40,6 +40,40 @@ TIER_A = ("IDENTIFIER_CHANGE", "DEPRECATION")
 SCORED_AGAINST_D1 = ("IDENTIFIER_CHANGE",)
 
 
+def score_negatives(repo: Path, rows: list[dict], columns_at) -> tuple[int, int, list[dict]]:
+    """How often does the detector cry drift on a description that never drifted?
+
+    Recall without this number is half a benchmark. A reader who sees "9/10" and
+    no false-positive count will assume precision is clean, so leaving it
+    unmeasured states a claim nobody wrote down.
+
+    A negative is a column whose description survived the window unchanged. It is
+    reconstructed exactly like a positive -- same schema source, same field
+    shape -- so the two numbers come off the same machinery.
+    """
+    false_positives, scored = [], 0
+    for r in rows:
+        # A negative carries one commit, not a window: the description never
+        # moved, so the state to reconstruct is the schema alongside it.
+        cols = columns_at(r["commit"], r["model"])
+        if not cols or r["column"] not in cols:
+            continue        # same skip as the positives: SQL not resolvable there
+        scored += 1
+        fields = [
+            {
+                "fieldPath": c,
+                "description": r["description"] if c == r["column"] else "",
+                "nativeDataType": "unknown",
+            }
+            for c in sorted(cols)
+        ]
+        urn = f"urn:li:dataset:(urn:li:dataPlatform:dbt,shopify.{r['model']},PROD)"
+        found = detect_schema_break(urn, "", fields, ["ev_bench"])
+        if any(f.category == "D1_SCHEMA_BREAK" and f.verdict == "DRIFT" for f in found):
+            false_positives.append(r)
+    return scored, len(false_positives), false_positives
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print(__doc__)
@@ -48,13 +82,24 @@ def main() -> None:
     rows = [json.loads(l) for l in (ROOT / "oracles" / "drift-labels-dbt-shopify.jsonl").read_text().splitlines() if l]
     tier_a = [r for r in rows if r.get("category") in TIER_A]
 
+    # sql_columns_at shells out to git; the 2,496 negatives collapse onto far
+    # fewer (commit, model) pairs, so without this the negative pass dominates
+    # the runtime.
+    _col_cache: dict[tuple[str, str], frozenset] = {}
+
+    def columns_at(commit: str, model: str):
+        key = (commit, model)
+        if key not in _col_cache:
+            _col_cache[key] = frozenset(sql_columns_at(repo, commit, model) or ())
+        return _col_cache[key]
+
     # Three outcomes, not two. Abstaining on the right column is not the same
     # as missing it: the steward still gets pointed at the exact spot, the
     # system just refuses to assert what happened to it.
     caught, flagged, missed, no_schema = [], [], [], []
     for r in tier_a:
         # Schema from c2: the code has already changed, the description has not
-        cols = sql_columns_at(repo, r["c2"], r["model"])
+        cols = columns_at(r["c2"], r["model"])
         if not cols:
             no_schema.append(r)
             continue
@@ -103,6 +148,14 @@ def main() -> None:
         if c + fl + m:
             print(f"    {cat:20s} drift {c}  abstained {fl}  nothing {m}")
 
+    negatives = [r for r in rows if r.get("label") == "stable"]
+    print(f"\n  negatives (description unchanged across the window): {len(negatives)}")
+    neg_scored, neg_fp, fp_rows = score_negatives(repo, negatives, columns_at)
+    print(f"    scorable:        {neg_scored}")
+    print(f"    false positives: {neg_fp}" + (f"  ({neg_fp/neg_scored:.2%})" if neg_scored else ""))
+    for r in fp_rows[:3]:
+        print(f"      {r['model']}.{r['column']}: {r['description'][:80]}")
+
     # Write the report so the numbers are reproducible without reading stdout
     d1 = [r for r in caught + flagged + missed if r["category"] in SCORED_AGAINST_D1]
     d1_caught = [r for r in caught if r["category"] in SCORED_AGAINST_D1]
@@ -130,6 +183,31 @@ def main() -> None:
         f"|---|---|---|---|",
         f"| IDENTIFIER_CHANGE | **{len(d1_caught)}** | {len(d1)} | yes — the prose names a field that the schema no longer has |",
         f"| DEPRECATION | {len(other_caught)} | {len(other)} | no — see below |",
+        "",
+        "## False positives on the negatives",
+        "",
+        f"| Negatives | Scorable | Asserted DRIFT (false positive) |",
+        f"|---|---|---|",
+        f"| {len(negatives)} | {neg_scored} | **{neg_fp}** ({neg_fp/neg_scored:.2%}) |"
+        if neg_scored else "| — | 0 | not scorable |",
+        "",
+        "A negative is a column whose description survived the window unchanged, so any",
+        "DRIFT verdict on one is wrong. Recall without this number is half a benchmark: a",
+        "reader seeing only 9/10 would assume precision is clean.",
+        "",
+        "The misses are one shape. Descriptions enumerate *values*, and enumerated values",
+        "look exactly like column names:",
+        "",
+        "```",
+        "  \"...such as `in_transit`, `label_printed`, `out_for_delivery`...\"",
+        "  \"...either `fixed_amount` or `percentage`...\"",
+        "  \"...whether the rules are disjunctive (`OR`) or conjunctive (`AND`)...\"",
+        "```",
+        "",
+        "None of those are fields, and none have a near-match in the schema — but they sit",
+        "in a *field* description, where the detector treats an unresolved snake_case token",
+        "as drift rather than abstaining. That branch is what earns the 9/10; this is what",
+        "it costs.",
         "",
         "## Why DEPRECATION is reported separately",
         "",

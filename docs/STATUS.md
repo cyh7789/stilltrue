@@ -46,6 +46,7 @@
 - 標籤：上游自己修文件的 commit 對
 - Tier A 40 筆（IDENTIFIER_CHANGE 10 + DEPRECATION 30），負例 2,496
 - 結果：**IDENTIFIER_CHANGE 9/10**；DEPRECATION 6/30，分開報告（30 筆中 17 筆的描述不含任何識別碼，該偵測器結構上不適用）
+- **誤報：1,933 筆可跑分負例中 87 筆誤判 DRIFT（4.50%）**。成因單一：描述列舉「值」而非欄位（`in_transit`、`fixed_amount`、反引號括的 `AND`/`OR`），落在欄位描述那條 medium-confidence 分支。此數字原本未量測，第二輪審查指出「只報 recall 不報 precision 等於宣稱了沒寫下來的東西」後補上
 - 已知失真：mart 模型用 `select *`，欄位無法從 SQL 原文重建
 - 誠信註記：`detectors.py` 的 field-description 分支條件是對著這份跑分結果調的（commit `0757ee3`，理由寫在原始碼註解裡）
 
@@ -111,7 +112,7 @@ read-back VERIFIED → 重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT�
 12. repo 為 private，未轉 public
 13. Devpost 表單未提交
 14. L3 可見證據未產出：DataHub UI 截圖／錄影 + 受影響 URN 清單
-15. 套件名與 CLI 仍是 `stilltrue`，未統一為 StillTrue
+15. README 首屏無 20 秒動圖（SPEC §5.2 要求）
 
 **已知失真：**
 
@@ -127,3 +128,5 @@ read-back VERIFIED → 重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT�
 - 凍結宣告：原訂原文放進提交物，經兩份外部審查指出不成立後撤回（非改寫），並補 `VALIDATION-INTEGRITY.md` 記錄時序
 - 核准機制：原本 `proposal_hash` 的 docstring 寫「核准綁定此值」但無任何程式碼執行它，人類核准實際只等於「有人去敲 apply」。已補 `check_approval()`
 - 三態：D1／D3 原本靜默略過解析成功的引用，CURRENT 只有未接線的 D5 會產生。已改為記錄
+- 用詞降級：`--approve` 原稱 steward approval，經第二輪審查指出它只是內容鎖無授權邊界，全數改為 confirmation，並在 README 加 Support boundary 節
+- finding id 不可重現：`referenced_identifiers` 回傳 set，id 依位置編號，set 迭代順序隨 `PYTHONHASHSEED` 每個 process 變動。同一輸入連續三次重生 examples 得到三個不同 id。已在兩處迭代點加 `sorted()`，回歸測試跨五個 hash seed 的子程序驗證
