@@ -1,9 +1,11 @@
-"""證據紀錄 — 系統對外的每一句主張都必須指回這裡的一筆 evidence_id。
+"""Evidence records — every claim this system makes must point back to one of these.
 
-設計約束（SPEC §1.2 第 2、5 條）：
-- 每筆證據記錄它是「哪個唯讀 function、什麼時候、對哪個 URN」取得的
-- payload 以 canonical JSON 算 hash，供事後複驗抓取內容有沒有被改過
-- evidence_id 由內容決定（同樣的觀察 → 同樣的 id），不用隨機值，重跑可比對
+Design constraints (SPEC 1.2, items 2 and 5):
+- each record captures which read-only function produced it, when, and for which URN
+- payloads are hashed over canonical JSON so anyone can re-check the captured
+  content was not edited afterwards
+- evidence_id is content-derived rather than random, so a re-run produces the
+  same ids and existing citations stay valid
 """
 
 from __future__ import annotations
@@ -14,7 +16,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-# 唯讀 adapter 允許暴露的 function（SPEC §1.2 第 2 條；寫入能力不在此列）
+# The only functions the read-only adapter is allowed to expose (SPEC 1.2 item 2).
+# Mutation tools are deliberately absent from this list.
 SourceFunction = Literal[
     "search",
     "get_entities",
@@ -27,10 +30,10 @@ SourceFunction = Literal[
 
 
 def canonical_hash(payload: Any) -> str:
-    """對 payload 取 canonical JSON 後的 sha256。
+    """sha256 over canonical JSON.
 
-    sort_keys 讓 dict 順序不影響 hash；separators 去掉多餘空白，
-    確保同一份觀察在不同機器上算出同一個值。
+    sort_keys makes dict ordering irrelevant and the compact separators strip
+    incidental whitespace, so the same observation hashes identically anywhere.
     """
     blob = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
@@ -51,10 +54,11 @@ class Evidence:
 
     @property
     def evidence_id(self) -> str:
-        """內容定址：同一個 URN + function + payload 永遠得到同一個 id。
+        """Content-addressed: same URN + function + payload always yields the same id.
 
-        captured_at 刻意不進 id —— 同一份事實重抓一次不該變成新證據，
-        否則 proposal 的引用會在每次重跑後全部失效。
+        captured_at is deliberately excluded. Re-reading the same fact should not
+        mint a new piece of evidence, otherwise every citation in every proposal
+        would break on the next run.
         """
         return "ev_" + canonical_hash(
             {"urn": self.entity_urn, "fn": self.source_function, "payload": self.payload}
@@ -72,7 +76,7 @@ class Evidence:
 
 
 class EvidenceStore:
-    """一次 scan 期間蒐集到的所有證據。append-only，不允許覆寫。"""
+    """Everything observed during one scan. Append-only; entries are never overwritten."""
 
     def __init__(self) -> None:
         self._items: dict[str, Evidence] = {}
@@ -80,7 +84,7 @@ class EvidenceStore:
     def add(self, ev: Evidence) -> str:
         existing = self._items.get(ev.evidence_id)
         if existing is not None and existing.payload_hash != ev.payload_hash:
-            raise ValueError(f"evidence_id 碰撞但內容不同: {ev.evidence_id}")
+            raise ValueError(f"evidence_id collision with differing content: {ev.evidence_id}")
         self._items.setdefault(ev.evidence_id, ev)
         return ev.evidence_id
 
@@ -88,9 +92,10 @@ class EvidenceStore:
         return self._items.get(evidence_id)
 
     def resolve_all(self, evidence_ids: list[str]) -> tuple[bool, list[str]]:
-        """檢查一組引用是否全部存在。回傳 (是否全中, 找不到的 id)。
+        """Check a set of citations. Returns (all_resolved, missing_ids).
 
-        Policy Gate 用它擋掉引用了不存在證據的 proposal。
+        The Policy Gate uses this to reject proposals citing evidence that does
+        not exist — the most common way a language model fakes its homework.
         """
         missing = [i for i in evidence_ids if i not in self._items]
         return (not missing, missing)

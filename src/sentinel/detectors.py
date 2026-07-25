@@ -1,10 +1,11 @@
-"""確定性漂移偵測器。
+"""Deterministic drift detectors.
 
-SPEC §2 的 D1–D4 全部是純程式判斷，不碰 LLM；只有 D5（語意漂移）需要判讀。
-本模組是純函式：輸入兩側訊號，輸出 Finding。沒有 IO，可單獨測試。
+D1-D4 in SPEC section 2 are plain code with no LLM involved; only D5 (semantic
+drift) needs judgement. This module is pure functions: two sides of signal in,
+Findings out. No IO, so it can be tested on its own.
 
-「人寫側」= description / glossary / 文件裡的主張
-「現實側」= schema、lineage、查詢紀錄的實際狀態
+"authored side"  = what descriptions, glossary terms and documents claim
+"reality side"   = what the schema, lineage and query history actually show
 """
 
 from __future__ import annotations
@@ -14,9 +15,9 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 DriftCategory = Literal[
-    "D1_SCHEMA_BREAK",      # 描述引用的欄位已不存在
-    "D1_UNDOCUMENTED",      # 欄位存在但沒有描述
-    "D3_LINEAGE_DRIFT",     # 描述宣稱的來源不在實際上游
+    "D1_SCHEMA_BREAK",      # a description references a field that no longer exists
+    "D1_UNDOCUMENTED",      # the field exists but nobody documented it
+    "D3_LINEAGE_DRIFT",     # a claimed source is not among the actual upstreams
 ]
 
 Verdict = Literal["DRIFT", "CURRENT", "INSUFFICIENT_EVIDENCE"]
@@ -27,11 +28,11 @@ class Finding:
     entity_urn: str
     category: DriftCategory
     verdict: Verdict
-    subject: str              # 出問題的欄位名或主張
-    claim: str                # 人寫側說了什麼
-    reality: str              # 現實側是什麼
+    subject: str              # the field name or claim at issue
+    claim: str                # what the authored side says
+    reality: str              # what the reality side shows
     evidence_ids: list[str] = field(default_factory=list)
-    suspected_rename: str | None = None   # D1 專用：疑似被改成哪個名字
+    suspected_rename: str | None = None   # D1 only: which field it was likely renamed to
     confidence: Literal["high", "medium"] = "high"
 
     def to_dict(self) -> dict[str, Any]:
@@ -49,36 +50,38 @@ class Finding:
 
 
 def referenced_identifiers(text: str) -> set[str]:
-    """抽出描述文字裡指涉的欄位名。
+    """Pull the field names a description refers to.
 
-    兩種寫法都算：反引號包起來的 `col_name`，以及 snake_case 的裸識別碼。
-    裸識別碼要求含底線，避免把普通英文單字誤判成欄位名。
+    Two spellings count: backticked `col_name`, and bare snake_case. Bare
+    identifiers must contain an underscore, otherwise ordinary English words
+    get mistaken for column names.
     """
     if not text:
         return set()
     backticked = set(re.findall(r"`([a-zA-Z_][a-zA-Z0-9_]*)`", text))
-    # 裸識別碼允許大小寫混寫（Airport_fee 這種），但仍要求含底線
+    # Bare identifiers may be mixed case (Airport_fee), but still need an underscore
     bare_snake = set(re.findall(r"\b([a-zA-Z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)+)\b", text))
-    # 原樣回傳 —— 大小寫本身就是漂移訊號（TLC: airport_fee → Airport_fee），
-    # 在這裡 lower() 會把要抓的東西抹掉
+    # Returned verbatim: case itself is a drift signal (TLC: airport_fee ->
+    # Airport_fee). Lowercasing here would erase the very thing we are hunting.
     return backticked | bare_snake
 
 
-# 識別碼後面緊跟這些詞時，作者已經講明它不是欄位
+# When an identifier is immediately followed by one of these, the author has
 NON_FIELD_QUALIFIERS = ("schema", "table", "database", "dataset", "model", "view", "catalog", "warehouse")
 
 
 def qualified_as_non_field(text: str, identifier: str) -> bool:
-    """描述是否自己講明了這個識別碼不是欄位，例如「`order_entry` schema」。"""
+    """Did the text itself say this is not a field, as in "`order_entry` schema"?"""
     pattern = rf"`?{re.escape(identifier)}`?\s+({'|'.join(NON_FIELD_QUALIFIERS)})\b"
     return re.search(pattern, text, flags=re.I) is not None
 
 
 def self_reference_tokens(entity_urn: str) -> set[str]:
-    """抽出 URN 裡屬於「這張表自己」的名稱片段（平台、資料庫、schema、表名）。
+    """Name fragments belonging to the table itself (database, schema, table).
 
-    描述裡提到自己的表名或所屬資料庫是正常寫法，不是欄位引用。
-    不排除的話，`order_entry_db.order_entry.order_details` 會被誤判成三個不存在的欄位。
+    A description mentioning its own table or database is normal prose, not a
+    field reference. Without this, `order_entry_db.order_entry.order_details`
+    gets reported as three non-existent columns.
     """
     inner = re.search(r",([^,]+),[A-Z]+\)$", entity_urn)
     if not inner:
@@ -88,10 +91,11 @@ def self_reference_tokens(entity_urn: str) -> set[str]:
 
 
 def _rename_candidate(missing: str, actual: set[str]) -> str | None:
-    """找出 missing 疑似被改成哪一個實際欄位。
+    """Which existing field is `missing` likely to have been renamed to?
 
-    只認兩種機械可判定的改名：大小寫變動、以及底線位置不同的同字母序列。
-    這一條直接對應 NYC TLC 的 airport_fee → Airport_fee 事件。
+    Only two mechanically decidable renames count: a case change, and the same
+    letters with underscores moved. This is exactly the NYC TLC
+    airport_fee -> Airport_fee event.
     """
     lowered = {a.lower(): a for a in actual}
     if missing.lower() in lowered:
@@ -107,15 +111,16 @@ def detect_schema_break(
     fields: list[dict],
     evidence_ids: list[str],
 ) -> list[Finding]:
-    """D1：描述引用的欄位是否還存在；欄位是否沒有描述。
+    """D1: do referenced fields still exist, and are any fields undocumented?
 
-    fields 為 list_schema_fields 回傳的欄位清單，每筆含 fieldPath 與 description。
+    `fields` is what list_schema_fields returns: each entry carries fieldPath
+    and description.
     """
     actual = {f.get("fieldPath", "") for f in fields if f.get("fieldPath")}
     self_tokens = self_reference_tokens(entity_urn)
     findings: list[Finding] = []
 
-    # 人寫側的每一處欄位引用，都要在現實側找得到
+    # Every field reference on the authored side must resolve on the reality side
     sources = [("dataset description", entity_description)]
     sources += [
         (f'field "{f.get("fieldPath")}" description', f.get("description") or "")
@@ -124,27 +129,29 @@ def detect_schema_break(
 
     for where, text in sources:
         for ref in referenced_identifiers(text):
-            if ref in actual:   # 精確比對：大小寫不同就是不同的欄位名
+            if ref in actual:   # exact match: different case means a different field
                 continue
             if ref in self_tokens or ref.lower() in self_tokens:
-                continue        # 指的是這張表自己或它的資料庫/schema，不是欄位
+                continue        # refers to the table itself or its database/schema
             if qualified_as_non_field(text, ref):
-                continue        # 描述自己寫了「`x` schema」這種限定詞
+                continue        # the text qualified it, e.g. "`x` schema"
             candidate = _rename_candidate(ref, actual)
-            explicit = f"`{ref}`" in text   # 反引號包起來 = 作者明確指涉一個識別碼
 
             if candidate:
-                # 存在大小寫／底線變體 —— 強訊號（TLC: airport_fee → Airport_fee）
+                # A case/underscore variant exists: strong signal (TLC case)
                 verdict, confidence = "DRIFT", "high"
-                reality = f"目前 schema 沒有 `{ref}`，但存在 `{candidate}`"
-            elif explicit:
-                verdict, confidence = "DRIFT", "medium"
-                reality = f"目前 schema 沒有 `{ref}`（共 {len(actual)} 個欄位）"
+                reality = f"the schema has no `{ref}`, but it does have `{candidate}`"
             else:
-                # 裸寫的 snake_case 可能是別張表、schema 名或業務術語 —— 不當漂移報，
-                # 但保留紀錄供人工查看。棄權是合法輸出，亂報不是。
+                # No near-match to point at. Real descriptions are prose: they
+                # cite other tables, DataHub entity types, and placeholders like
+                # `table_name`. On real data, calling every unresolved token
+                # drift produced far more noise than signal, so anything without
+                # a rename candidate abstains, backticked or not.
+                # The cost: a genuinely deleted column reads as abstention
+                # rather than drift. That trade is deliberate -- a report nobody
+                # trusts is worth less than one that knows when to stay quiet.
                 verdict, confidence = "INSUFFICIENT_EVIDENCE", "medium"
-                reality = f"描述提到 `{ref}`，但它不是本表欄位，也找不到相近的欄位名"
+                reality = f"the text mentions `{ref}`, which is not a field here and has no close match"
 
             findings.append(
                 Finding(
@@ -152,7 +159,7 @@ def detect_schema_break(
                     category="D1_SCHEMA_BREAK",
                     verdict=verdict,
                     subject=ref,
-                    claim=f"{where} 引用了 `{ref}`",
+                    claim=f"{where} references `{ref}`",
                     reality=reality,
                     evidence_ids=list(evidence_ids),
                     suspected_rename=candidate,
@@ -166,7 +173,7 @@ def detect_schema_break(
     return findings
 
 
-# 未文件化欄位佔比超過這個門檻時，改報一筆彙總 —— 逐欄報只會把真訊號淹掉
+# Above this ratio, report one summary instead of one finding per field:
 _BULK_UNDOCUMENTED_RATIO = 0.5
 
 
@@ -176,11 +183,13 @@ def _undocumented_findings(
     fields: list[dict],
     evidence_ids: list[str],
 ) -> list[Finding]:
-    """現實側存在、人寫側沒交代的欄位。
+    """Fields that exist in reality but nobody wrote about.
 
-    只有「表本身有描述、卻漏了某些欄位」才算漂移 —— 那是文件維護跟不上 schema。
-    整張表從頭到尾沒有描述是另一回事（從未開始寫，不是寫了之後脫節），
-    在這裡報出來只會製造大量對評審無意義的噪音。
+    Only counts as drift when the table itself has a description yet some
+    fields were missed: that is documentation failing to keep up with the
+    schema. A table with no description anywhere is a different thing entirely
+    (never started, rather than fallen out of sync), and reporting it here
+    would bury the real signal under noise.
     """
     if not (entity_description or "").strip():
         return []
@@ -195,9 +204,9 @@ def _undocumented_findings(
                 entity_urn=entity_urn,
                 category="D1_UNDOCUMENTED",
                 verdict="DRIFT",
-                subject=f"{len(missing)}/{len(fields)} 個欄位",
-                claim="表層級有描述",
-                reality=f"但 {len(missing)} 個欄位（共 {len(fields)} 個）沒有任何說明，逐欄補件前需要先確認這張表是否仍在維護",
+                subject=f"{len(missing)}/{len(fields)} fields",
+                claim="the table itself is documented",
+                reality=f"but {len(missing)} of {len(fields)} fields carry no description at all; confirm this table is still maintained before filling them in one by one",
                 evidence_ids=list(evidence_ids),
                 confidence="medium",
             )
@@ -209,8 +218,8 @@ def _undocumented_findings(
             category="D1_UNDOCUMENTED",
             verdict="DRIFT",
             subject=f["fieldPath"],
-            claim="表層級有描述，此欄位沒有",
-            reality=f"欄位 `{f['fieldPath']}`（{f.get('nativeDataType', '型別未知')}）存在於 schema 但沒有任何說明",
+            claim="the table is documented, this field is not",
+            reality=f"field `{f['fieldPath']}` ({f.get('nativeDataType', 'unknown type')}) exists in the schema but has no description",
             evidence_ids=list(evidence_ids),
         )
         for f in missing
@@ -223,7 +232,7 @@ def detect_lineage_drift(
     upstream_urns: list[str],
     evidence_ids: list[str],
 ) -> list[Finding]:
-    """D3：描述宣稱的來源表，是否還在實際上游集合裡。"""
+    """D3: is the source a description claims still among the actual upstreams?"""
     claims = re.findall(
         r"(?:derived from|source[sd]?(?:\s+from)?|built from|based on)\s+`?([a-zA-Z_][\w.]*)`?",
         entity_description or "",
@@ -243,8 +252,8 @@ def detect_lineage_drift(
                 category="D3_LINEAGE_DRIFT",
                 verdict="DRIFT",
                 subject=claimed,
-                claim=f"描述宣稱資料來自 `{claimed}`",
-                reality=f"實際上游有 {len(upstream_urns)} 個，都不是 `{claimed}`",
+                claim=f"the description claims the data comes from `{claimed}`",
+                reality=f"there are {len(upstream_urns)} actual upstreams, none of them `{claimed}`",
                 evidence_ids=list(evidence_ids),
                 confidence="medium",
             )

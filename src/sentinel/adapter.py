@@ -1,11 +1,13 @@
-"""唯讀 DataHub adapter — 系統讀取 context graph 的唯一入口。
+"""Read-only DataHub adapter: the system's single entry point to the context graph.
 
-安全約束（SPEC §1.2 第 2 條）：本模組**只** wrap Agent Context Kit 的讀取工具。
-寫入工具（add_tags / add_glossary_terms / descriptions / documents / add_owners）
-刻意不在此出現，也不 import —— 寫入路徑走 executor.py，且由另一組憑證執行。
+Security constraint (SPEC 1.2 item 2): this module wraps **only** the read
+tools of the Agent Context Kit. The mutation tools (add_tags,
+add_glossary_terms, descriptions, documents, add_owners) are deliberately
+absent and never imported here. Writes go through executor.py under a
+separate credential.
 
-每次呼叫都會把結果登記成 Evidence，讓後續任何主張都能指回「哪個 function、
-對哪個 URN、在什麼時候、拿到什麼內容」。
+Every call registers its result as Evidence, so any later claim can point back
+to which function read which URN, when, and what it returned.
 """
 
 from __future__ import annotations
@@ -17,7 +19,21 @@ from .evidence import Evidence, EvidenceStore
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# 白名單：唯一允許被 adapter 呼叫的 Agent Context Kit 工具
+def authored_description(entity: dict) -> str:
+    """The description a human would actually see in the DataHub UI.
+
+    DataHub keeps two of them: `properties.description` comes from ingestion,
+    `editableProperties.description` is what someone typed in the UI or wrote
+    through the API. The UI shows the editable one when it exists, so that is
+    the text a reader believes — and therefore the text that can be lying.
+    Reading only `properties` misses it entirely.
+    """
+    editable = (entity.get("editableProperties") or {}).get("description") or ""
+    ingested = (entity.get("properties") or {}).get("description") or ""
+    return editable.strip() or ingested.strip()
+
+
+# Whitelist: the only Agent Context Kit tools this adapter may call
 READ_ONLY_TOOLS = (
     "get_entities",
     "list_schema_fields",
@@ -28,9 +44,9 @@ READ_ONLY_TOOLS = (
 
 
 class ReadOnlyDataHubAdapter:
-    """對 DataHub 的唯讀視窗。
+    """A read-only window onto DataHub.
 
-    使用方式：
+    Usage:
         with ReadOnlyDataHubAdapter(server="http://localhost:8080") as adapter:
             entity, ev_id = adapter.get_entity(urn)
     """
@@ -58,10 +74,10 @@ class ReadOnlyDataHubAdapter:
     def _record(self, urn: str, fn: str, payload: Any) -> str:
         return self.evidence.add(Evidence(entity_urn=urn, source_function=fn, payload=payload))
 
-    # --- 唯讀工具，逐個薄包裝並登記證據 -------------------------------
+    # --- read-only tools: thin wrappers that register evidence ---------
 
     def get_entity(self, urn: str) -> tuple[dict, str]:
-        """取單一 entity 的 metadata（含人寫的 description）。"""
+        """Fetch one entity's metadata, including the human-authored description."""
         from datahub_agent_context.mcp_tools import get_entities
 
         result = get_entities([urn])
@@ -69,28 +85,28 @@ class ReadOnlyDataHubAdapter:
         return payload, self._record(urn, "get_entities", payload)
 
     def list_schema_fields(self, urn: str, limit: int = 100) -> tuple[dict, str]:
-        """取 dataset 的欄位清單 —— 「資料現實」的主要來源。"""
+        """List the dataset's fields: the main source of reality-side signal."""
         from datahub_agent_context.mcp_tools import list_schema_fields
 
         payload = list_schema_fields(urn, limit=limit)
         return payload, self._record(urn, "list_schema_fields", payload)
 
     def get_lineage(self, urn: str, upstream: bool = True, max_hops: int = 1) -> tuple[dict, str]:
-        """取上下游 —— 用於比對描述宣稱的來源表是否還在上游集合裡。"""
+        """Fetch lineage, used to check whether a claimed source is still upstream."""
         from datahub_agent_context.mcp_tools import get_lineage
 
         payload = get_lineage(urn, upstream=upstream, max_hops=max_hops)
         return payload, self._record(urn, "get_lineage", payload)
 
     def get_dataset_queries(self, urn: str, column: str | None = None, count: int = 10) -> tuple[dict, str]:
-        """取實際查詢紀錄 —— 語意漂移（D5）靠它看欄位真正怎麼被用。"""
+        """Fetch real query history: how D5 sees the way a field is actually used."""
         from datahub_agent_context.mcp_tools import get_dataset_queries
 
         payload = get_dataset_queries(urn, column=column, count=count)
         return payload, self._record(urn, "get_dataset_queries", payload)
 
     def grep_documents(self, urns: list[str], pattern: str) -> tuple[dict, str]:
-        """在文件內容中搜尋 —— 找出還在引用舊欄位名的說明文件。"""
+        """Search inside documents for prose still referencing an old field name."""
         from datahub_agent_context.mcp_tools import grep_documents
 
         payload = grep_documents(urns, pattern)

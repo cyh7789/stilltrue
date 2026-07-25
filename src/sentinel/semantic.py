@@ -1,19 +1,23 @@
-"""D5 語意/glossary 漂移偵測 —— 全系統唯一允許 LLM 介入的類別（SPEC §2）。
+"""D5 semantic/glossary drift detection -- the only category in the system where an LLM may intervene (SPEC §2).
 
-要抓的失效模式（BRIEF §9.5，Pinterest 在 DataHub town hall 的案例）：
-同一個商業指標在不同部門各有定義 —— finance 的日活與 marketing 的不一樣，
-safety 先濾掉 bot 的那份數字又成了 marketing 的視角。單獨看每一份都對，
-但兩個 agent 各引一份時，使用者拿到互相矛盾的答案，而且沒有任何錯誤訊號。
+The failure mode to catch (BRIEF §9.5, the Pinterest case from the DataHub town hall):
+the same business metric is defined differently in each department -- finance's daily
+active users differ from marketing's, and the figure where safety filtered out bots
+first is in turn marketing's view. Each copy is correct in isolation, but when two
+agents each cite one, the user gets contradictory answers with no error signal at all.
 
-控制流分三段，LLM 被夾在兩道確定性閘之間：
+The control flow has three stages, with the LLM sandwiched between two deterministic gates:
 
-1. 預篩（純函式）：term 掛 ≥2 個 entity、且過濾條件集合不同，才成為候選。
-   條件相同的定義差異只是措辭問題，不是語意衝突，不值得花一次 LLM 呼叫。
-2. 判讀（注入）：判讀器是注入的 Callable —— 本模組不 import 任何 SDK、
-   不發任何網路請求，正式跑注入 LLM 判讀器，測試注入假的。
-3. 引文閘（純函式）：判讀說衝突不足以成案 —— 兩側引文缺一、或引文
-   對不上定義原文（LLM 幻覺引文的典型症狀），一律降級 INSUFFICIENT_EVIDENCE。
-   棄權是合法輸出（SPEC 三態設計）；沒有證據的指控才是問題。
+1. Prefilter (pure function): a pair becomes a candidate only when the term is attached
+   to >=2 entities AND the filter condition sets differ. Definition differences with
+   identical conditions are just wording, not semantic conflict, and not worth an LLM call.
+2. Judgment (injected): the judge is an injected Callable -- this module imports no SDK
+   and makes no network requests; production injects an LLM judge, tests inject a fake.
+3. Citation gate (pure function): a conflict judgment alone is not enough to stand --
+   if either side's quote is missing, or a quote does not match the original definition
+   text (the classic symptom of LLM-hallucinated citations), downgrade to INSUFFICIENT_EVIDENCE.
+   Abstaining is a legitimate output (SPEC three-state design); an accusation without
+   evidence is the problem.
 """
 
 from __future__ import annotations
@@ -28,34 +32,38 @@ from .detectors import Verdict
 
 @dataclass(frozen=True)
 class TermAttachment:
-    """glossary term 掛在單一 entity 上的觀察 —— 預篩與判讀的最小輸入單位。
+    """An observation of a glossary term attached to a single entity -- the minimal input unit for the prefilter and the judge.
 
-    filters 是上游已經解析好的 WHERE 條件字串清單；本模組不碰 SQL 解析，
-    否則預篩就不再是可獨立測試的純函式。
+    filters is the list of WHERE condition strings already parsed upstream; this module
+    does not touch SQL parsing, otherwise the prefilter would no longer be an
+    independently testable pure function.
     """
 
     entity_urn: str
-    definition: str                     # 該 entity 上這個 term 的定義原文
-    filters: tuple[str, ...]            # 對應欄位查詢的 WHERE 條件（已解析）
+    definition: str                     # original definition text of this term on that entity
+    filters: tuple[str, ...]            # WHERE conditions of the corresponding column queries (already parsed)
     evidence_ids: tuple[str, ...] = ()
 
 
 def _normalized_filter_set(filters: tuple[str, ...]) -> frozenset[str]:
-    """把條件清單化成可比較的集合。
+    """Turn the condition list into a comparable set.
 
-    只做空白正規化與去重 —— 條件的順序和排版是查詢寫法的雜訊，不是語意。
-    刻意不做大小寫正規化：字串字面值的大小寫可能有語意（'Bot' 與 'bot'
-    可能是不同的標籤值），預篩寧可多放進判讀，也不能把真衝突濾掉。
+    Only whitespace normalization and dedup -- condition order and formatting are
+    query-style noise, not semantics. Deliberately no case normalization: the case of
+    string literals can be semantic ('Bot' and 'bot' may be different tag values);
+    the prefilter would rather send extra pairs to the judge than filter out a real conflict.
     """
     return frozenset(re.sub(r"\s+", " ", f).strip() for f in filters if f.strip())
 
 
 def prescreen(attachments: list[TermAttachment]) -> list[tuple[TermAttachment, TermAttachment]]:
-    """確定性預篩：回傳值得送判讀的 entity 配對。
+    """Deterministic prefilter: return the entity pairs worth sending to the judge.
 
-    term 只掛一個 entity 時沒有「兩套定義」可言；過濾條件集合相同時，
-    定義文字再怎麼不同也只是措辭差異 —— 兩者都直接出局，不佔 LLM 額度。
-    定義為空的一側註定過不了引文閘（沒有原文可引），先擋下來省一次呼叫。
+    With the term attached to only one entity there are no "two definitions" to speak of;
+    with identical filter sets, no matter how different the definition text is, it's just
+    a wording difference -- both cases are out immediately and consume no LLM quota.
+    A side with an empty definition is bound to fail the citation gate (no original text
+    to quote), so block it up front and save a call.
     """
     if len(attachments) < 2:
         return []
@@ -69,19 +77,20 @@ def prescreen(attachments: list[TermAttachment]) -> list[tuple[TermAttachment, T
 
 @dataclass(frozen=True)
 class Judgment:
-    """判讀器的回覆。引文欄位是強制的 —— 判讀器必須從各側定義原文逐字擷取。"""
+    """The judge's reply. The quote fields are mandatory -- the judge must extract them verbatim from each side's original definition text."""
 
-    conflict: bool                      # 兩份定義是否構成語意衝突
-    quote_a: str                        # 從 a 側定義擷取的引文（逐字）
-    quote_b: str                        # 從 b 側定義擷取的引文（逐字）
+    conflict: bool                      # whether the two definitions constitute a semantic conflict
+    quote_a: str                        # quote extracted from side a's definition (verbatim)
+    quote_b: str                        # quote extracted from side b's definition (verbatim)
     rationale: str = ""
 
 
 class SemanticJudge(Protocol):
-    """判讀器介面。正式跑注入 LLM 實作，測試注入假的。
+    """The judge interface. Production injects an LLM implementation, tests inject a fake.
 
-    用 Protocol 而不是基底類別：呼叫端只依賴這個簽名，任何符合簽名的
-    Callable（含測試裡的普通函式）都能注入，不必繼承任何東西。
+    Protocol instead of a base class: callers depend only on this signature, and any
+    Callable matching it (including plain functions in tests) can be injected without
+    inheriting anything.
     """
 
     def __call__(self, term: str, a: TermAttachment, b: TermAttachment) -> Judgment: ...
@@ -89,17 +98,19 @@ class SemanticJudge(Protocol):
 
 @dataclass
 class SemanticFinding:
-    """D5 的產出。不重用 detectors.Finding —— 它的 category 是封閉 Literal、
+    """D5's output. Does not reuse detectors.Finding -- its category is a closed Literal,
 
-    claim/reality 是「人寫側 vs 現實側」的單向結構，而 D5 的衝突是對稱的：
-    兩側都是人寫的定義，硬塞進去會丟失「哪份引文屬於哪個 entity」的對應。
-    兩側的定義原文與過濾條件都完整入檔，steward 不用回頭查就能複驗。
+    and claim/reality is a one-way "human-written side vs reality side" structure, while
+    a D5 conflict is symmetric: both sides are human-written definitions, and forcing it
+    in would lose the mapping of which quote belongs to which entity. Both sides'
+    original definition text and filters go into the record in full, so the steward can
+    re-verify without looking anything up.
     """
 
     term: str
     verdict: Verdict
     entity_a: str
-    definition_a: str                   # a 側定義原文（引文閘的比對基準）
+    definition_a: str                   # side a's original definition text (the citation gate's comparison baseline)
     filters_a: tuple[str, ...]
     entity_b: str
     definition_b: str
@@ -129,10 +140,11 @@ class SemanticFinding:
 
 
 def _quote_is_grounded(quote: str, definition: str) -> bool:
-    """引文必須逐字出現在定義原文裡才算證據。
+    """A quote counts as evidence only if it appears verbatim in the original definition text.
 
-    LLM 產生「意思差不多但原文沒有」的引文是已知失效模式；
-    對不上原文的引文再有說服力也不能進報告（SPEC §5 citation validity）。
+    LLMs producing quotes that are "roughly the right meaning but not in the original"
+    is a known failure mode; a quote that does not match the source cannot enter the
+    report no matter how persuasive it is (SPEC §5 citation validity).
     """
     return bool(quote.strip()) and quote.strip() in definition
 
@@ -142,12 +154,14 @@ def detect_semantic_drift(
     attachments: list[TermAttachment],
     judge: SemanticJudge,
 ) -> list[SemanticFinding]:
-    """D5 主流程：預篩 → 注入的判讀器 → 引文閘。
+    """D5 main flow: prefilter → injected judge → citation gate.
 
-    判讀說「衝突」但引文閘沒過 → 降級 INSUFFICIENT_EVIDENCE，不是丟棄：
-    留下紀錄讓 steward 知道這一對曾被判為可疑，只是系統拿不出合格證據。
-    判讀說「不衝突」→ 記一筆 CURRENT —— LLM 呼叫已經花了，結論要入帳，
-    複跑時才能對照同一配對的判讀有沒有漂移。
+    Judge says "conflict" but the citation gate fails → downgrade to INSUFFICIENT_EVIDENCE,
+    not discard: keep the record so the steward knows this pair was once judged suspicious,
+    only the system could not produce qualifying evidence.
+    Judge says "no conflict" → record a CURRENT entry -- the LLM call has already been
+    spent, so the conclusion goes on the books, and a re-run can compare whether the
+    judgment for the same pair has drifted.
     """
     findings: list[SemanticFinding] = []
     for a, b in prescreen(attachments):

@@ -1,7 +1,8 @@
-"""Write Executor 的行為測試。
+"""Behavior tests for the Write Executor.
 
-三個保護各測一遍，用注入的 reader 模擬真實會發生的狀況：
-別人搶先改了、腳本被重跑、API 說成功但值沒進去。
+One test per protection, using an injected reader to simulate what actually
+happens: someone else changed it first, the script got re-run, the API said
+success but the value never landed.
 """
 
 import sys
@@ -21,7 +22,7 @@ def _proposal() -> Proposal:
     return Proposal(
         entity_urn=URN, aspect="dataset_description", verdict="DRIFT", subject="description",
         before_value=BEFORE, after_value=AFTER,
-        rationale="schema 欄位名為 Airport_fee。", evidence_ids=["ev_1"],
+        rationale="the schema field is named Airport_fee.", evidence_ids=["ev_1"],
     )
 
 
@@ -32,17 +33,17 @@ def test_dry_run_verifies_without_writing():
 
 
 def test_conflict_when_someone_changed_it_first():
-    """從產生提案到核准之間，別人已經改過同一段描述 —— 不能覆蓋掉。"""
+    """Between proposal generation and approval someone else already changed the same description -- must not overwrite it."""
     p = _proposal()
     ex = WriteExecutor(reader=lambda _: "someone else rewrote this", dry_run=True)
     r = ex.execute(p, p.proposal_hash)
 
     assert r.status == "CONFLICT"
-    assert "未寫入" in r.detail
+    assert "nothing written" in r.detail
 
 
 def test_second_run_is_idempotent():
-    """重跑腳本不該把同一個變更套用兩次。"""
+    """Re-running the script must not apply the same change twice."""
     p = _proposal()
     ex = WriteExecutor(reader=lambda _: BEFORE, dry_run=True)
 
@@ -51,34 +52,34 @@ def test_second_run_is_idempotent():
 
 
 def test_approval_hash_must_match_proposal_content():
-    """核准後又改內容 —— 舊核准不能拿來執行新內容。"""
+    """Content edited after approval -- the old approval must not execute the new content."""
     p = _proposal()
     ex = WriteExecutor(reader=lambda _: BEFORE, dry_run=True)
     r = ex.execute(p, "approved_hash_of_a_different_version")
 
     assert r.status == "FAILED"
-    assert "核准" in r.detail
+    assert "approval" in r.detail
 
 
 def test_readback_mismatch_does_not_auto_retry():
-    """API 回成功但值沒進去：標記 VERIFY_FAILED，交給人，不自己重試。"""
+    """API reports success but the value never landed: mark VERIFY_FAILED, hand it to a human, no self-retry."""
     p = _proposal()
     calls = {"n": 0}
 
     def reader(_):
         calls["n"] += 1
-        return BEFORE   # 寫入後重讀仍是舊值 —— 代表沒寫進去
+        return BEFORE   # readback after the write still shows the old value -- the write never landed
 
     ex = WriteExecutor(reader=reader, dry_run=False)
-    ex._write = lambda _p: None   # 假裝 API 呼叫成功
+    ex._write = lambda _p: None   # pretend the API call succeeded
     r = ex.execute(p, p.proposal_hash)
 
     assert r.status == "VERIFY_FAILED"
-    assert calls["n"] == 2        # 寫前一次、寫後一次，沒有第三次重試
+    assert calls["n"] == 2        # once before the write, once after, no third retry
 
 
 def test_write_failure_is_recorded_not_raised():
-    """呼叫爆掉時要留下收據，不是把例外往上丟讓整批中斷。"""
+    """When the call blows up, leave a receipt instead of raising and aborting the whole batch."""
     p = _proposal()
     ex = WriteExecutor(reader=lambda _: BEFORE, dry_run=False)
 

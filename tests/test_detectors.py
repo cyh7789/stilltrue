@@ -1,7 +1,7 @@
-"""D1 偵測器的行為測試。
+"""Behavior tests for the D1 detector.
 
-每一條都對應開發時真實踩過的坑，不是為了覆蓋率補的。
-測的是行為：把偵測邏輯弄壞，這些會紅；只改名字不會。
+Each test maps to a real pitfall hit during development, none added just for coverage.
+They test behavior: break the detection logic and these go red; renaming things won't.
 """
 
 import sys
@@ -20,10 +20,10 @@ def _drift(findings):
 
 
 def test_tlc_case_rename_is_detected():
-    """NYC TLC 2023-02 真實事件：airport_fee 被改成 Airport_fee，描述沒跟上。
+    """Real NYC TLC 2023-02 incident: airport_fee became Airport_fee, the description didn't follow.
 
-    這個案例曾經完全抓不到 —— 因為偵測器把兩側都 lower() 之後，
-    大小寫差異被自己的正規化抹平了。
+    This case used to be completely missed -- the detector lower()ed both sides,
+    so its own normalization erased the case difference.
     """
     fields = [{"fieldPath": "Airport_fee", "description": "Airport fee", "nativeDataType": "double"}]
     found = _drift(detect_schema_break(TLC_URN, "Fare breakdown includes airport_fee for LGA/JFK pickups.", fields, ["ev1"]))
@@ -35,7 +35,7 @@ def test_tlc_case_rename_is_detected():
 
 
 def test_tlc_new_undocumented_column_is_detected():
-    """NYC TLC 2025-01 真實事件：新增 cbd_congestion_fee，沒有任何描述。"""
+    """Real NYC TLC 2025-01 incident: cbd_congestion_fee added with no description at all."""
     fields = [
         {"fieldPath": "cbd_congestion_fee", "description": "", "nativeDataType": "double"},
         {"fieldPath": "trip_distance", "description": "Elapsed trip distance", "nativeDataType": "double"},
@@ -47,15 +47,15 @@ def test_tlc_new_undocumented_column_is_detected():
 
 
 def test_consistent_description_produces_nothing():
-    """描述與現實一致時不得有任何輸出 —— 誤報一次就毀掉整份報告的可信度。"""
+    """A description consistent with reality must produce no output -- one false positive ruins the credibility of the whole report."""
     fields = [{"fieldPath": "trip_distance", "description": "Elapsed trip distance in miles", "nativeDataType": "double"}]
     assert detect_schema_break(TLC_URN, "Records include trip_distance per ride.", fields, ["ev3"]) == []
 
 
 def test_self_table_name_is_not_a_field_reference():
-    """描述提到自己的表名/資料庫名是正常寫法。
+    """Mentioning your own table/database name in a description is normal writing.
 
-    實測誤報：order_details、order_entry_db 都曾被當成不存在的欄位報出來。
+    Observed false positives: order_details and order_entry_db were both reported as nonexistent fields.
     """
     fields = [{"fieldPath": "order_id", "description": "Order id", "nativeDataType": "NUMBER"}]
     desc = "Detailed order lines from order_entry_db.analytics.order_details."
@@ -63,9 +63,9 @@ def test_self_table_name_is_not_a_field_reference():
 
 
 def test_identifier_qualified_as_schema_is_ignored():
-    """描述寫「`order_entry` schema」時，作者已講明那不是欄位。
+    """When a description says "`order_entry` schema", the author already made clear it's not a field.
 
-    實測誤報：showcase-ecommerce 的 order_details 描述就是這樣寫的。
+    Observed false positive: the order_details description in showcase-ecommerce is written exactly like this.
     """
     fields = [{"fieldPath": "order_id", "description": "Order id", "nativeDataType": "NUMBER"}]
     desc = "Combines data from multiple tables in the `order_entry` schema."
@@ -73,9 +73,9 @@ def test_identifier_qualified_as_schema_is_ignored():
 
 
 def test_unknown_bare_identifier_abstains_instead_of_reporting():
-    """裸寫、又找不到相近欄位的識別碼 → 棄權，不是漂移。
+    """A bare identifier with no close field match → abstain, not drift.
 
-    棄權是合法輸出（SPEC 三態設計）；把不確定的東西報成 DRIFT 才是問題。
+    Abstaining is a legitimate output (SPEC three-state design); reporting something uncertain as DRIFT is the real problem.
     """
     fields = [{"fieldPath": "order_id", "description": "Order id", "nativeDataType": "NUMBER"}]
     findings = detect_schema_break(DBT_URN, "Joined with some_other_thing during ETL.", fields, ["ev6"])

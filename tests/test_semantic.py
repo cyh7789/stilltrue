@@ -1,7 +1,8 @@
-"""D5 語意漂移偵測器的行為測試。
+"""Behavior tests for the D5 semantic drift detector.
 
-判讀器一律用注入的假貨 —— 測的是本模組的控制流與引文閘，
-不是任何 LLM 的判讀品質。把預篩或引文閘弄壞，這些會紅；只改名字不會。
+The judge is always an injected fake -- these test this module's control flow
+and citation gate, not any LLM's judgment quality. Break the pre-filter or the
+citation gate and these go red; renaming things won't.
 """
 
 import sys
@@ -15,7 +16,7 @@ from sentinel.semantic import (  # noqa: E402
     detect_semantic_drift,
 )
 
-# Pinterest 案例的最小重現：同一個 DAU term，marketing 側先濾掉 bot
+# Minimal reproduction of the Pinterest case: same DAU term, the marketing side filters out bots first
 FINANCE = TermAttachment(
     entity_urn="urn:li:dataset:(urn:li:dataPlatform:hive,finance.dau_daily,PROD)",
     definition="Daily active users: all accounts with at least one session per day.",
@@ -31,7 +32,7 @@ MARKETING = TermAttachment(
 
 
 class RecordingJudge:
-    """記錄每次被呼叫的配對，回傳預先設定的判讀結果。"""
+    """Records every pair it gets called with; returns a preset judgment."""
 
     def __init__(self, judgment: Judgment) -> None:
         self.judgment = judgment
@@ -43,26 +44,26 @@ class RecordingJudge:
 
 
 def _conflict_with_valid_quotes() -> Judgment:
-    """引文逐字取自上面兩份定義 —— 引文閘應該放行的合格判讀。"""
+    """Quotes taken verbatim from the two definitions above -- a valid judgment the citation gate should let through."""
     return Judgment(
         conflict=True,
         quote_a="all accounts with at least one session",
         quote_b="excluding accounts flagged as bots",
-        rationale="一側含 bot 一側排除，同名指標分母不同",
+        rationale="one side includes bots, the other excludes them, so the same metric has different denominators",
     )
 
 
 def test_single_entity_never_triggers():
-    """term 只掛一個 entity 時沒有第二份定義可衝突，判讀器一次都不能被呼叫。"""
+    """With only one entity attached to the term there is no second definition to conflict with; the judge must never be called."""
     judge = RecordingJudge(_conflict_with_valid_quotes())
     assert detect_semantic_drift("DAU", [FINANCE], judge) == []
     assert judge.calls == []
 
 
 def test_identical_filters_never_reach_judge():
-    """過濾條件相同代表兩側看的是同一個母體，措辭差異不是語意衝突。
+    """Identical filters mean both sides look at the same population; wording differences are not semantic conflict.
 
-    順序與排版不同仍算相同 —— 那是查詢寫法的雜訊，送判讀就是浪費 LLM 額度。
+    Different order and formatting still count as identical -- that's query-style noise, and sending it to the judge wastes LLM quota.
     """
     same_population = TermAttachment(
         entity_urn="urn:li:dataset:(urn:li:dataPlatform:hive,growth.dau_daily,PROD)",
@@ -76,7 +77,7 @@ def test_identical_filters_never_reach_judge():
 
 
 def test_differing_filters_are_sent_to_judge_exactly_once():
-    """條件集合不同的配對才進判讀，且同一對只判一次。"""
+    """Only pairs with differing filter sets reach the judge, and each pair is judged exactly once."""
     judge = RecordingJudge(_conflict_with_valid_quotes())
     detect_semantic_drift("DAU", [FINANCE, MARKETING], judge)
 
@@ -84,9 +85,9 @@ def test_differing_filters_are_sent_to_judge_exactly_once():
 
 
 def test_conflict_with_both_quotes_yields_drift_carrying_both_sides():
-    """判讀說衝突且兩側引文合格 → DRIFT，且兩側定義原文與過濾條件都要入檔。
+    """Judge says conflict and both quotes are valid → DRIFT, carrying both sides' original definitions and filters.
 
-    steward 複驗時只能看 finding 本身 —— 缺任何一側的原文，複驗閘就是虛設。
+    The steward re-verifies from the finding alone -- without either side's original text, the re-verification gate is a sham.
     """
     judge = RecordingJudge(_conflict_with_valid_quotes())
     findings = detect_semantic_drift("DAU", [FINANCE, MARKETING], judge)
@@ -102,7 +103,7 @@ def test_conflict_with_both_quotes_yields_drift_carrying_both_sides():
 
 
 def test_missing_quote_downgrades_to_insufficient_evidence():
-    """判讀說衝突但缺一側引文 → 降級棄權，不是 DRIFT 也不是丟棄。"""
+    """Judge says conflict but one quote is missing → downgrade to abstain, not DRIFT and not discarded."""
     judge = RecordingJudge(
         Judgment(conflict=True, quote_a="all accounts with at least one session", quote_b="")
     )
@@ -112,16 +113,17 @@ def test_missing_quote_downgrades_to_insufficient_evidence():
 
 
 def test_hallucinated_quote_downgrades_to_insufficient_evidence():
-    """引文兩側都有、但其中一側對不上定義原文 → 一樣降級。
+    """Both quotes present, but one doesn't match the original definition text → same downgrade.
 
-    「意思差不多但原文沒有」是 LLM 引文的已知失效模式，
-    對不上原文的引文不是證據（SPEC §5 citation validity）。
+    "Roughly the right meaning but not in the original" is a known failure mode
+    of LLM citations; a quote that doesn't match the source is not evidence
+    (SPEC §5 citation validity).
     """
     judge = RecordingJudge(
         Judgment(
             conflict=True,
             quote_a="all accounts with at least one session",
-            quote_b="bots are removed before counting",  # 定義原文裡沒有這句
+            quote_b="bots are removed before counting",  # this sentence is not in the original definition
         )
     )
     findings = detect_semantic_drift("DAU", [FINANCE, MARKETING], judge)
@@ -130,7 +132,7 @@ def test_hallucinated_quote_downgrades_to_insufficient_evidence():
 
 
 def test_judge_says_consistent_records_current():
-    """判讀說不衝突 → 記 CURRENT 入帳，複跑時才能比對同一配對的判讀有沒有漂移。"""
+    """Judge says no conflict → record CURRENT, so a re-run can compare whether the judgment for the same pair has drifted."""
     judge = RecordingJudge(Judgment(conflict=False, quote_a="", quote_b=""))
     findings = detect_semantic_drift("DAU", [FINANCE, MARKETING], judge)
 

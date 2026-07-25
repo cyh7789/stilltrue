@@ -8,7 +8,7 @@ for mo in months:
         s = pq.read_schema(fs.open(base.format(mo)))
         names = [f.name for f in s]
     except Exception as e:
-        print(f"{mo}: 取不到 ({type(e).__name__})"); continue
+        print(f"{mo}: unavailable ({type(e).__name__})"); continue
     if prev is not None:
         added = [n for n in names if n not in prev]
         removed = [n for n in prev if n not in names]
@@ -16,7 +16,7 @@ for mo in months:
         if added or removed:
             rows.append({"month": mo, "added": added, "removed": removed,
                          "case_rename": [f"{r}->{a}" for r, a in renamed]})
-            print(f"{mo}: +{added} -{removed} 大小寫改名={[f'{r}->{a}' for r,a in renamed]}")
+            print(f"{mo}: +{added} -{removed} case_rename={[f'{r}->{a}' for r,a in renamed]}")
     prev = names
-print("\n=== 漂移事件總數:", len(rows), "===")
+print("\n=== total drift events:", len(rows), "===")
 json.dump(rows, open("tlc-drift-events.json", "w"), indent=2)

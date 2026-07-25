@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-第三方 holdout 挖掘器 — 從公開 dbt 專案的 git 歷史抽出「文件漂移」的自然標籤。
+Third-party holdout miner -- extracts natural "documentation drift" labels from a public dbt project's git history.
 
-原理：drift 不是我們植入的，標籤也不是我們標的。
-  事件 A（c1）：commit 改了 model 的 SQL 欄位，但沒改 yml 裡對應的欄位描述
-  事件 B（c2）：之後某個 commit 才補上那段描述
-  → c1..c2 之間，該描述處於 drift 狀態，類別由 diff 型態機械判定
+Principle: the drift is not planted by us, and the labels are not annotated by us.
+  Event A (c1): a commit changes the model's SQL columns but not the matching column description in the yml
+  Event B (c2): a later commit finally fixes that description
+  → between c1..c2 the description is in a drift state; the category is determined mechanically from the diff shape
 
-送進受測系統時只搬 c1 時點的狀態（描述取 c1 的 yml，schema 取 c1 的 SQL），
-系統看不到 git —— git 只是 oracle 的產地。
+Only the state at c1 is fed to the system under test (description from c1's yml, schema from c1's SQL);
+the system never sees git -- git is only where the oracle comes from.
 
-用法：
+Usage:
   python3 mine_holdout.py <repo_path> [--out holdout.jsonl] [--report]
 """
 
@@ -32,13 +32,13 @@ def git(repo: Path, *args: str) -> str:
 
 
 def commits_touching(repo: Path, pattern: str) -> list[str]:
-    """回傳影響指定路徑樣式的 commit（舊→新）。"""
+    """Return commits touching the given path pattern (oldest → newest)."""
     out = git(repo, "log", "--reverse", "--format=%H", "--", pattern)
     return [c for c in out.splitlines() if c]
 
 
 def yml_columns_at(repo: Path, commit: str, path: str) -> dict[tuple[str, str], str]:
-    """取某 commit 的某個 yml 裡 (model, column) → description。"""
+    """Get (model, column) → description from a given yml at a given commit."""
     blob = git(repo, "show", f"{commit}:{path}")
     if not blob.strip():
         return {}
@@ -62,35 +62,35 @@ def yml_columns_at(repo: Path, commit: str, path: str) -> dict[tuple[str, str], 
 
 
 def sql_columns_at(repo: Path, commit: str, model: str) -> set[str]:
-    """從 model 的 SQL 粗抽 select 出來的欄位別名。用於判定改名/新增/移除。"""
+    """Roughly extract the selected column aliases from the model's SQL. Used to classify rename/add/remove."""
     files = [f for f in git(repo, "ls-tree", "-r", "--name-only", commit).splitlines()
              if f.endswith(f"/{model}.sql") or f == f"models/{model}.sql"]
     if not files:
         return set()
     sql = git(repo, "show", f"{commit}:{files[0]}")
-    # dbt 的 staging model 慣例：`col as alias` 或直接列欄位名
+    # dbt staging model convention: `col as alias` or bare column names
     aliases = set(re.findall(r"\bas\s+([a-zA-Z_][a-zA-Z0-9_]*)", sql, flags=re.I))
     bare = set(re.findall(r"^\s{4,}([a-z_][a-z0-9_]*)\s*,\s*$", sql, flags=re.M))
     return {a.lower() for a in aliases | bare}
 
 
 def _normalize(text: str) -> str:
-    """抹掉不改變語意的差異：大小寫、標點、空白、非 ASCII 雜訊。"""
+    """Erase differences that don't change meaning: case, punctuation, whitespace, non-ASCII noise."""
     t = re.sub(r"[^\x00-\x7f]", "", text.lower())
     t = re.sub(r"[^a-z0-9`_]+", " ", t)
     return " ".join(t.split())
 
 
 def _identifiers(text: str) -> set[str]:
-    """反引號包起來的識別碼 —— 描述裡指涉的欄位/表名。"""
+    """Backtick-quoted identifiers -- the field/table names the description refers to."""
     return {m.lower() for m in re.findall(r"`([a-zA-Z_][a-zA-Z0-9_]*)`", text)}
 
 
 def classify(before: str, after: str) -> str | None:
-    """回傳漂移類別；判定為非漂移（純錯字/格式）時回 None。"""
+    """Return the drift category; None when judged non-drift (pure typo/formatting)."""
     nb, na = _normalize(before), _normalize(after)
     if nb == na:
-        return None  # 只差標點、大小寫或編碼雜訊
+        return None  # differs only in punctuation, case, or encoding noise
     import difflib
     ratio = difflib.SequenceMatcher(None, nb, na).ratio()
     ids_b, ids_a = _identifiers(before), _identifiers(after)
@@ -100,13 +100,13 @@ def classify(before: str, after: str) -> str | None:
     if ids_b != ids_a:
         return "IDENTIFIER_CHANGE"
     if nb and nb in na and len(na) - len(nb) < 40:
-        # 舊描述整段保留、只多了一小段補充（典型：批次補上 "in shop currency"）
-        # 這是把不完整的描述講精確，不是文件與現實脫節 —— 不計入漂移
+        # the old description survives intact with only a small addition (typical: batch-adding "in shop currency")
+        # that's making an incomplete description precise, not docs diverging from reality -- not counted as drift
         return None
     if re.search(r"\b(source|derived from|upstream|joined)\b", na + nb):
         return "LINEAGE"
     if ratio > 0.95 and len(na) - len(nb) < 15:
-        return None  # 高度相似且沒有實質新增 —— 視為潤稿
+        return None  # highly similar with no substantial addition -- treated as copy-editing
     return "SEMANTIC"
 
 
@@ -120,9 +120,9 @@ def main() -> None:
         out_path = Path(sys.argv[sys.argv.index("--out") + 1])
 
     yml_files = [f for f in git(repo, "ls-files", "models").splitlines() if f.endswith(".yml")]
-    print(f"yml 檔 {len(yml_files)} 個")
+    print(f"{len(yml_files)} yml files")
 
-    # (model, column) → [(commit, description), ...] 依時序
+    # (model, column) → [(commit, description), ...] in chronological order
     history: dict[tuple[str, str], list[tuple[str, str]]] = defaultdict(list)
     for path in yml_files:
         commits = commits_touching(repo, path)
@@ -138,7 +138,7 @@ def main() -> None:
     positives, negatives, rejected = [], [], 0
     for (model, column), seq in history.items():
         if len(seq) >= 2:
-            # 描述被改過 → 每一次修改都是「人類補文件」的行為，前一個狀態即 drift 端點
+            # the description was edited → every edit is a "human fixing the docs" event; the previous state is the drift endpoint
             for i in range(1, len(seq)):
                 c1, desc_before = seq[i - 1]
                 c2, desc_after = seq[i]
@@ -146,7 +146,7 @@ def main() -> None:
                     continue
                 category = classify(desc_before, desc_after)
                 if category is None:
-                    rejected += 1  # 純錯字或潤稿，不是漂移
+                    rejected += 1  # pure typo or copy-editing, not drift
                     continue
                 positives.append({
                     "model": model, "column": column,
@@ -170,14 +170,14 @@ def main() -> None:
     from collections import Counter
     by_cat = Counter(p["category"] for p in positives)
 
-    print(f"\n正例（實質漂移）：{len(positives)}")
+    print(f"\nPositives (real drift): {len(positives)}")
     for cat, n in by_cat.most_common():
         print(f"    {cat}: {n}")
-    print(f"濾除（純錯字／潤稿）：{rejected}")
-    print(f"負例（描述從未變動）：{len(negatives)}")
+    print(f"Filtered out (pure typos/copy-editing): {rejected}")
+    print(f"Negatives (description never changed): {len(negatives)}")
     print(f"→ {out_path}")
-    print("\nSPEC 門檻：正例 >= 30、負例 >= 100 →",
-          "通過" if len(positives) >= 30 and len(negatives) >= 100 else "不通過，換候選 repo")
+    print("\nSPEC threshold: positives >= 30, negatives >= 100 →",
+          "pass" if len(positives) >= 30 and len(negatives) >= 100 else "fail, pick another candidate repo")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,9 @@
-"""Hash 鏈審計帳本的行為測試。
+"""Behavior tests for the hash-chained audit ledger.
 
-每一條都模擬一種真實竄改手法：直接改寫 JSONL 檔再跑 verify()。
-測的是「竄改會被抓到、位置回報正確」這個行為 ——
-把 verify 的任一個檢查弄壞，對應的測試就會紅；只改名字不會。
+Each test simulates a real tampering technique: rewrite the JSONL file directly,
+then run verify(). What's tested is the behavior "tampering gets caught and the
+position is reported correctly" -- break any of verify's checks and the matching
+test goes red; renaming things won't.
 """
 
 import json
@@ -43,7 +44,7 @@ def test_intact_chain_verifies(tmp_path: Path) -> None:
 
 
 def test_empty_ledger_is_valid(tmp_path: Path) -> None:
-    """檔案還不存在的帳本視為有效 —— 第一次 scan 之前跑 verify 不該報錯。"""
+    """A ledger whose file doesn't exist yet counts as valid -- running verify before the first scan must not fail."""
     led = AuditLedger(tmp_path / "audit.jsonl")
 
     ok, _ = led.verify()
@@ -52,7 +53,7 @@ def test_empty_ledger_is_valid(tmp_path: Path) -> None:
 
 
 def test_content_tamper_is_caught_at_position(tmp_path: Path) -> None:
-    """改一筆 payload 但沒重算 hash —— 最直接的竄改手法。"""
+    """Edit one payload without recomputing the hash -- the most direct tampering technique."""
     path = tmp_path / "audit.jsonl"
     led = _build_ledger(path)
 
@@ -64,13 +65,13 @@ def test_content_tamper_is_caught_at_position(tmp_path: Path) -> None:
 
     ok, msg = led.verify()
     assert not ok
-    assert "第 3 筆" in msg
+    assert "record 3" in msg
 
 
 def test_recomputed_hash_tamper_is_still_caught(tmp_path: Path) -> None:
-    """竄改者連 entry_hash 一起重算 —— 下一筆的 prev_hash 仍會咬住它。
+    """The tamperer recomputes entry_hash as well -- the next entry's prev_hash still catches it.
 
-    這條擋掉「verify 只重算單筆 hash、不追鏈」的偷懶實作。
+    This blocks the lazy implementation where verify only recomputes per-entry hashes without following the chain.
     """
     path = tmp_path / "audit.jsonl"
     led = _build_ledger(path)
@@ -85,7 +86,7 @@ def test_recomputed_hash_tamper_is_still_caught(tmp_path: Path) -> None:
 
     ok, msg = led.verify()
     assert not ok
-    assert "第 4 筆" in msg
+    assert "record 4" in msg
 
 
 def test_deleted_middle_entry_is_caught(tmp_path: Path) -> None:
@@ -98,8 +99,8 @@ def test_deleted_middle_entry_is_caught(tmp_path: Path) -> None:
 
     ok, msg = led.verify()
     assert not ok
-    # 原第 4 筆補上來變成第 3 行，它的 prev_hash 指向被刪的那筆 → 在這裡斷鏈
-    assert "第 3 筆" in msg
+    # the original 4th entry shifts up to line 3; its prev_hash points at the deleted entry → the chain breaks here
+    assert "record 3" in msg
 
 
 def test_swapped_entries_are_caught(tmp_path: Path) -> None:
@@ -112,11 +113,11 @@ def test_swapped_entries_are_caught(tmp_path: Path) -> None:
 
     ok, msg = led.verify()
     assert not ok
-    assert "第 2 筆" in msg
+    assert "record 2" in msg
 
 
 def test_reopened_ledger_continues_chain(tmp_path: Path) -> None:
-    """跨次執行必須接在既有鏈尾 —— 重開若另起新鏈，後續紀錄會全部斷鏈。"""
+    """A new run must append to the existing chain tail -- if reopening started a fresh chain, every later record would break the chain."""
     path = tmp_path / "audit.jsonl"
     _build_ledger(path, n=2)
 

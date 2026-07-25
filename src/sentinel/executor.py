@@ -1,13 +1,17 @@
-"""寫入執行器 — 唯一會改動 DataHub 的地方。
+"""Write executor: the only place that mutates DataHub.
 
-與 adapter 的分工（SPEC §1.2 第 2、9–12 條）：adapter 只讀、拿唯讀憑證；
-executor 只在拿到核准後寫，且寫入前後都自己重讀一次確認。
-提案由誰產生不影響這裡的判斷 —— 沒有核准、或核准對不上內容，就不寫。
+Split of duties with the adapter (SPEC 1.2, items 2 and 9-12): the adapter only
+reads and holds a read-only credential; the executor only writes after an
+approval, and re-reads both before and after. Who produced the proposal makes
+no difference here. No approval, or an approval that does not match the
+content, means no write.
 
-三個保護，各擋一種真實會發生的事：
-- 寫前重讀：從產生提案到核准之間，別人可能已經改過同一個欄位（TOCTOU）
-- 冪等鍵：重跑腳本、重試網路失敗時，不會把同一個變更套用兩次
-- 寫後回讀：API 回 200 不代表值真的寫進去了
+Three guards, each for something that genuinely happens:
+- re-read before write: between proposal and approval, someone else may have
+  edited the same field (TOCTOU)
+- idempotency key: re-running a script or retrying a network failure must not
+  apply the same change twice
+- read-back after write: a 200 response does not mean the value landed
 """
 
 from __future__ import annotations
@@ -23,11 +27,11 @@ from .proposal import Proposal
 warnings.filterwarnings("ignore", category=UserWarning)
 
 ExecutionStatus = Literal[
-    "VERIFIED",        # 寫入成功且回讀確認
-    "CONFLICT",        # 寫入前發現現況已與提案基準不同，未寫入
-    "DUPLICATE",       # 同一個冪等鍵已經執行過，未重複寫入
-    "VERIFY_FAILED",   # 寫入後回讀對不上 —— 不自動重試，交給人
-    "FAILED",          # 呼叫本身失敗
+    "VERIFIED",        # written and confirmed by read-back
+    "CONFLICT",        # current value no longer matches the proposal baseline; nothing written
+    "DUPLICATE",       # this idempotency key already ran; not applied again
+    "VERIFY_FAILED",   # read-back disagrees; never auto-retried, handed to a human
+    "FAILED",          # the call itself failed
 ]
 
 
@@ -54,7 +58,7 @@ class Receipt:
 
 
 def idempotency_key(p: Proposal) -> str:
-    """同一個 (entity, aspect, subject, 提案內容) 只該被套用一次。"""
+    """The same (entity, aspect, subject, proposal content) must apply only once."""
     return canonical_hash({
         "urn": p.entity_urn, "aspect": p.aspect,
         "subject": p.subject, "proposal": p.proposal_hash,
@@ -62,10 +66,11 @@ def idempotency_key(p: Proposal) -> str:
 
 
 class WriteExecutor:
-    """把已核准的提案寫回 DataHub。
+    """Write an approved proposal back to DataHub.
 
-    reader 參數是一個「重讀目前值」的函式，注入而非內建 —— 讓寫前檢查與寫後回讀
-    可以在測試中不碰真實 DataHub，也讓 executor 不需要知道值是怎麼讀出來的。
+    `reader` is injected rather than built in: it re-reads the current value, so
+    the before/after checks can run against a fake in tests, and the executor
+    never needs to know how that value is fetched.
     """
 
     def __init__(
@@ -86,22 +91,22 @@ class WriteExecutor:
 
         if approved_hash != p.proposal_hash:
             return self._record(Receipt(key, p.proposal_hash, p.entity_urn, "FAILED",
-                                        "核准的 proposal_hash 與提案內容不符，提案可能在核准後被修改"))
+                                        "approved proposal_hash does not match the content; the proposal may have been edited after approval"))
 
         prior = self._receipts.get(key)
         if prior is not None and prior.status in ("VERIFIED", "DUPLICATE"):
             return Receipt(key, p.proposal_hash, p.entity_urn, "DUPLICATE",
-                           f"此變更已於 {prior.executed_at} 套用，未重複寫入")
+                           f"already applied at {prior.executed_at}; not written again")
 
         current = self.reader(p)
         if canonical_hash({"urn": p.entity_urn, "aspect": p.aspect,
                            "subject": p.subject, "value": current}) != p.before_hash:
             return self._record(Receipt(key, p.proposal_hash, p.entity_urn, "CONFLICT",
-                                        "寫入前重讀發現現況已與提案基準不同，未寫入"))
+                                        "re-read before write shows the current value no longer matches the proposal baseline; nothing written"))
 
         if self.dry_run:
             return self._record(Receipt(key, p.proposal_hash, p.entity_urn, "VERIFIED",
-                                        "dry-run：未實際寫入"))
+                                        "dry run: nothing written"))
 
         try:
             self._write(p)
@@ -112,13 +117,13 @@ class WriteExecutor:
         after = self.reader(p)
         if after.strip() != p.after_value.strip():
             return self._record(Receipt(key, p.proposal_hash, p.entity_urn, "VERIFY_FAILED",
-                                        "寫入後回讀的內容與提案不符 —— 不自動重試，需人工確認"))
+                                        "read-back after write disagrees with the proposal; not retried automatically, needs a human"))
 
         return self._record(Receipt(key, p.proposal_hash, p.entity_urn, "VERIFIED",
-                                    "寫入完成並經回讀確認"))
+                                    "written and confirmed by read-back"))
 
     def _write(self, p: Proposal) -> None:
-        """實際呼叫 DataHub。每次只做一個白名單內的變更。"""
+        """The actual DataHub call. Exactly one whitelisted change per invocation."""
         from datahub.sdk import DataHubClient
         from datahub_agent_context import DataHubContext
         from datahub_agent_context.mcp_tools import descriptions
@@ -135,7 +140,7 @@ class WriteExecutor:
                     description=p.after_value, column_path=p.subject,
                 )
             else:
-                raise ValueError(f"executor 不支援的 aspect: {p.aspect}")
+                raise ValueError(f"executor does not support aspect: {p.aspect}")
 
     def _record(self, r: Receipt) -> Receipt:
         self._receipts[r.idempotency_key] = r
