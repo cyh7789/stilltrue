@@ -1,6 +1,6 @@
 # StillTrue（Build with DataHub: The Agent Hackathon）— 接手紀錄
 
-> 更新 2026-07-26。截止 2026-08-10 17:00 EDT ＝ 台北 8/11 05:00，剩 15 天。
+> 更新 2026-07-26（第二輪審查後）。截止 2026-08-10 17:00 EDT ＝ 台北 8/11 05:00，剩 15 天。
 > 前身 Serow / Blast-Radius Guard 已封存（`cyh7789/blast-radius-guard`，archived）。
 > 本作是重做，不複用舊程式碼。
 
@@ -9,8 +9,7 @@
 偵測 DataHub 裡「人寫的描述」與「schema／lineage 現實」脫節之處，附證據提出修正，
 經核准後寫回 graph。投賽道 Agents That Do Real Work。
 
-對外名 **StillTrue**（repo `cyh7789/stilltrue`，private）。
-⚠️ 程式碼內套件名與 CLI 仍是 `sentinel`，提交前要統一。
+對外名、套件名、CLI 命令均為 **stilltrue**（repo `cyh7789/stilltrue`，private）。
 
 ## 為什麼是這題（決策依據）
 
@@ -40,46 +39,54 @@ executor（寫前重讀／冪等／寫後回讀）、ledger（hash 鏈）、cli�
 - datahub-project/datahub **#18622** — 公開 `resolve_description()`，CI 全綠
 - datahub-project/datahub-skills **#49** — `datahub-context-drift` skill
 
-## 待辦（順序已與阿毛確認）
+## 待辦（兩輪四份審查後定案，順序含硬約束）
 
-1. **修 holdout 的說法**（約 1h，誠信問題）
-   codex review 指出：兩份第三方資料都在開發過程被反覆執行，其中一輪還改到
-   `detectors.py`，因此**不構成凍結 holdout**。要改稱 benchmark，並揭露修正歷程。
-   涉及 README.md、bench/REPORT.md、bench/SHOPIFY-REPORT.md、docs/HOLDOUT-nyc-tlc.md。
+⚠️ **硬約束：凍結必須在所有程式碼改動之後、新來源單跑之前。**
+所以執行時間軸是「D2 → 凍結 → 新 holdout 單跑 → 提交面」，與下面的效益排序相反。
 
-2. **D5 接真 LLM 判讀器 + 真查詢資料**
-   硬前提：showcase-ecommerce 的 `get_dataset_queries` 回傳 total 為 0，沒有輸入。
-   **設 8 小時停損**：取不到真實查詢資料就砍 D5，範圍縮成 D1/D3，
-   同時移除 Pinterest 語意衝突那段敘事，不留宣稱。
-   不做的代價（codex 原話）：容易被評為「規則式 schema／lineage linter」。
-
-3. **補一份真正凍結的第三方 benchmark**（前兩項完成、系統穩定後才凍結）
-   先產出 `freeze.json`（code／規則／prompt／分類定義 hash），再取新來源，只跑一次，
-   不因結果改碼。找不到合格來源就刪掉「holdout」與凍結宣告，不換詞掩飾。
-
-4. **L3 可見證據**：DataHub UI 截圖／錄影 + URN 清單，逐筆可對。
-   ROUTE 對 L3 的驗收不是「有寫回」而是「UI 上看得到」。
-
-5. **影片、轉 public、Devpost 送件**（最後三天）
+1. **提交消費面**（約 4 天，效益最大）
+   影片 2 天（分鏡照 SPEC §5，素材已現成：demo 的 NOT_APPROVED 與 STALE 兩顆鏡頭）；
+   README 定稿 1 天（含 L3 證據——URN 清單 + DataHub UI 截圖）；
+   repo 轉 public + About 區 Apache-2.0 + Devpost 0.5 天。
    提交時**不要勾** Feedback Survey 獎——與其他獎互斥。
 
-## 待收
+2. **凍結 + 一條凍結後的新第三方來源，單跑一次**（1.5–2 天）
+   `freeze.json` 釘住 detectors／分類定義／跑分腳本的 hash → 用現成的
+   `mine_drift_labels.py` 換一個沒碰過的同型 dbt 套件 → 只跑一次，難看照登。
+   兩份既有 benchmark 已證實塑造過規則，重跑它們量的仍是 fit，救不回 Grand 級第一件。
 
-duo 的對照 review（`/private/tmp/dh-review/duo/REVIEW.md`）。第一次靜默死掉已重派。
-codex 那份在 `/private/tmp/dh-review/codex/REVIEW.md`，結論摘要見下。
+3. **D2 新鮮度偵測**（1.5–2 天）—— 兩路分歧，選 D2 不選 D5
+   duo 的三條理由：D5 的 8 小時停損幾乎必然觸發（`get_dataset_queries` total 為 0）；
+   D2 有官方 `nyc-taxi` datapack 自帶 planted freshness issues 當 ground truth；
+   **灌合成資料跑 D5 會在剛清完的誠信傷口上再開一刀**——Aman 的痛點就是 silent failure，
+   合成輸入正是另一種 silent failure。做完可講「三類實作＋兩類明文降級」。
 
-## codex review 的關鍵判定
+**刻意不做**：D5 接真 LLM、Review UI、程序級憑證分離（README 標界即可）、
+內部 holdout（第 2 項已覆蓋其目的）、修 dbt_shopify 那 4.5% 誤報
+（審查要的是量測不是修，且修完又變成「對著 benchmark 調」）。
+
+## 四份審查（都在 repo 裡）
+
+`docs/REVIEW-r1-{codex,duo}.md`、`docs/REVIEW-r2-{codex,duo}.md`。
+第二輪讓兩路各自複核自己第一輪的發現——`captured_at` 那個誤判就是由犯錯的那一路自己撤回的。
+
+⚠️ **派 duo 的兩個前置條件**（踩過兩次才發現）：工作目錄必須是 git repo（`git init` + 一次 commit），
+且必須存在 `.claude/rules/` 目錄，否則初始化就靜默死掉，run.log 只留一行 bun 警告。
+
+## 第二輪的關鍵判定
 
 | 項目 | 判定 |
 |---|---|
-| 題目／賽道 | 沒有偏離 ROUTE |
-| 可證明的審計 | **已兌現** |
-| 第三方 holdout | **未兌現**（見待辦 1、3） |
-| 斜角複核 | 只兌現一半——D5 不能跑，最強敘事沒有 demo |
-| 最弱評分項 | **Submission Quality**：現在還不是可評審的提交物 |
+| 凍結宣告撤回 | **誠實面已關閉**（duo：「教科書等級」）；證據面仍空，需第 2 項 |
+| 第三方 holdout | **仍是空的**，不是打折——揭露不會把 benchmark 變回 holdout |
+| `--approve` 核准閘 | 關掉「核准後偷換內容」（質變），**沒關掉核准者身分**。已把用詞全數降級 |
+| CURRENT 三態 | 補足宣稱，不是湊規格 |
+| 最弱 | **Submission Quality**，仍接近零 |
+| 最危險 | 從 Technical Execution 換成 **Originality**——唯一一條目前拿不出任何肯定證據的 |
 
-一句要記住的：**「資源投入明顯偏向程式與 benchmark，judge-facing 證據落後。」**
-這與當初盲批對 Serow 的批評同構——同一個坑踩了兩次。
+Originality 危險的理由：`b2_datahub_native` 對照不存在、D5 停擺後「第五類 agent」只剩敘事。
+評審席上坐著 Nick Adams（四類 agent 清單作者）與 Maggie Hays（DataHub Founding PM），
+「這跟我們現成的 Quality skill 差在哪」是他們職務上必然會問的，而現在的答案是空白。
 
 ## 開發中踩過的坑（別再犯）
 
@@ -93,6 +100,10 @@ codex 那份在 `/private/tmp/dh-review/codex/REVIEW.md`，結論摘要見下。
    （schema 取 c1 而非 c2；描述掛表層而非欄位層；被刪欄位的描述遭丟棄）。
    第三次是外部診斷指出的，紀錄在 `docs/DIAGNOSIS-shopify-scoring.md`。
 5. **卡關要派 duo 診斷**，不要自己硬修——我自己修兩輪都沒修到點上。
+6. **set 迭代順序隨 PYTHONHASHSEED 變**：finding id 依位置編號，examples 連續三次重生
+   拿到三個不同 id。同一個 process 內測不出來，回歸測試要跨子程序跑不同 seed。
+7. **只報 recall 不報 precision 等於宣稱了沒寫下來的東西**：dbt_shopify 的 2,496 筆負例
+   躺在標籤檔裡從沒跑過，補測是 4.5% 誤報（87/1,933），成因是描述列舉「值」而非欄位。
 
 ## 相關路徑
 
