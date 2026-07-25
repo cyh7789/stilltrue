@@ -160,23 +160,61 @@ def detect_schema_break(
                 )
             )
 
-    # 現實側存在、人寫側完全沒交代的欄位
-    for f in fields:
-        path = f.get("fieldPath")
-        if path and not (f.get("description") or "").strip():
-            findings.append(
-                Finding(
-                    entity_urn=entity_urn,
-                    category="D1_UNDOCUMENTED",
-                    verdict="DRIFT",
-                    subject=path,
-                    claim="無描述",
-                    reality=f"欄位 `{path}`（{f.get('nativeDataType', '型別未知')}）存在於 schema 但沒有任何說明",
-                    evidence_ids=list(evidence_ids),
-                )
-            )
-
+    findings.extend(
+        _undocumented_findings(entity_urn, entity_description, fields, evidence_ids)
+    )
     return findings
+
+
+# 未文件化欄位佔比超過這個門檻時，改報一筆彙總 —— 逐欄報只會把真訊號淹掉
+_BULK_UNDOCUMENTED_RATIO = 0.5
+
+
+def _undocumented_findings(
+    entity_urn: str,
+    entity_description: str,
+    fields: list[dict],
+    evidence_ids: list[str],
+) -> list[Finding]:
+    """現實側存在、人寫側沒交代的欄位。
+
+    只有「表本身有描述、卻漏了某些欄位」才算漂移 —— 那是文件維護跟不上 schema。
+    整張表從頭到尾沒有描述是另一回事（從未開始寫，不是寫了之後脫節），
+    在這裡報出來只會製造大量對評審無意義的噪音。
+    """
+    if not (entity_description or "").strip():
+        return []
+
+    missing = [f for f in fields if f.get("fieldPath") and not (f.get("description") or "").strip()]
+    if not missing:
+        return []
+
+    if len(missing) / len(fields) > _BULK_UNDOCUMENTED_RATIO:
+        return [
+            Finding(
+                entity_urn=entity_urn,
+                category="D1_UNDOCUMENTED",
+                verdict="DRIFT",
+                subject=f"{len(missing)}/{len(fields)} 個欄位",
+                claim="表層級有描述",
+                reality=f"但 {len(missing)} 個欄位（共 {len(fields)} 個）沒有任何說明，逐欄補件前需要先確認這張表是否仍在維護",
+                evidence_ids=list(evidence_ids),
+                confidence="medium",
+            )
+        ]
+
+    return [
+        Finding(
+            entity_urn=entity_urn,
+            category="D1_UNDOCUMENTED",
+            verdict="DRIFT",
+            subject=f["fieldPath"],
+            claim="表層級有描述，此欄位沒有",
+            reality=f"欄位 `{f['fieldPath']}`（{f.get('nativeDataType', '型別未知')}）存在於 schema 但沒有任何說明",
+            evidence_ids=list(evidence_ids),
+        )
+        for f in missing
+    ]
 
 
 def detect_lineage_drift(
