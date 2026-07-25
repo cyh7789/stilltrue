@@ -2,7 +2,7 @@
 
 Each baseline is something a team could plausibly do today, in increasing order
 of how much DataHub context it uses. Running all of them against the same
-holdout is how "we needed the context graph for this" stops being a claim and
+benchmark is how "we needed the context graph for this" stops being a claim and
 becomes a number.
 
 B0  no context          only the prose. No schema, no lineage.

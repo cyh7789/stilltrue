@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Third-party holdout miner -- extracts natural "documentation drift" labels from a public dbt project's git history.
+Third-party drift-label miner -- extracts natural "documentation drift" labels from a public dbt project's git history.
 
 Principle: the drift is not planted by us, and the labels are not annotated by us.
   Event A (c1): a commit changes the model's SQL columns but not the matching column description in the yml
@@ -11,7 +11,7 @@ Only the state at c1 is fed to the system under test (description from c1's yml,
 the system never sees git -- git is only where the oracle comes from.
 
 Usage:
-  python3 mine_holdout.py <repo_path> [--out holdout.jsonl] [--report]
+  python3 mine_drift_labels.py <repo_path> [--out drift-labels.jsonl] [--report]
 """
 
 import json
@@ -115,7 +115,7 @@ def main() -> None:
         print(__doc__)
         sys.exit(1)
     repo = Path(sys.argv[1])
-    out_path = Path("holdout.jsonl")
+    out_path = Path("drift-labels.jsonl")
     if "--out" in sys.argv:
         out_path = Path(sys.argv[sys.argv.index("--out") + 1])
 

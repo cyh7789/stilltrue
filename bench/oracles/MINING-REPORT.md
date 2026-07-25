@@ -1,7 +1,7 @@
-# 第三方 Holdout 挖掘報告
+# 第三方漂移標籤挖掘報告
 
 > 執行日 2026-07-25。來源：`fivetran/dbt_shopify`（Apache-2.0，428 commits，2020-09→2026-06）。
-> 挖掘器：`mine_holdout.py`。輸出：`holdout-dbt-shopify.jsonl`。
+> 挖掘器：`mine_drift_labels.py`。輸出：`drift-labels-dbt-shopify.jsonl`。
 
 ## 為什麼標籤不是我們標的
 
@@ -49,11 +49,11 @@ drift 由上游專案自己造成，標籤來自**上游自己補文件的那個
 
 1. **不再繼續調整過濾器**。再往下調就變成調參到數字好看。Tier B 的 179 筆未逐筆人工驗證，其中混有精確化與真漂移，比例未知——因此不計入主要指標。
 2. 主 benchmark 的分母公開：Tier A 正例 40、負例 2,496。
-3. 過濾器本身是機械規則，程式碼在 `mine_holdout.py`，任何人可重跑複驗。
+3. 過濾器本身是機械規則，程式碼在 `mine_drift_labels.py`，任何人可重跑複驗。
 
-## 與 NYC TLC holdout 的分工
+## 與 NYC TLC benchmark 的分工
 
-| Holdout | 測什麼 | 正例 | 標籤來源 |
+| Benchmark | 測什麼 | 正例 | 標籤來源 |
 |---|---|---:|---|
 | `fivetran/dbt_shopify` | 文件 vs 程式碼的漂移 | 40（Tier A） | 上游自己的修正 commit |
 | NYC TLC | 文件 vs 資料的漂移 | 2 | 兩個月份 parquet schema 的差集 |

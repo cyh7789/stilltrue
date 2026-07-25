@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Score the detector against the fivetran/dbt_shopify holdout.
+"""Score the detector against the fivetran/dbt_shopify benchmark.
 
 For every Tier A positive, reconstruct the drift window: the description as it
 stood at c1 (before anyone fixed it), against the model's columns as the SQL
@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / "src"))
 
-from oracles.mine_holdout import sql_columns_at  # noqa: E402
+from oracles.mine_drift_labels import sql_columns_at  # noqa: E402
 from sentinel.detectors import detect_schema_break  # noqa: E402
 
 TIER_A = ("IDENTIFIER_CHANGE", "DEPRECATION")
@@ -45,7 +45,7 @@ def main() -> None:
         print(__doc__)
         sys.exit(1)
     repo = Path(sys.argv[1])
-    rows = [json.loads(l) for l in (ROOT / "oracles" / "holdout-dbt-shopify.jsonl").read_text().splitlines() if l]
+    rows = [json.loads(l) for l in (ROOT / "oracles" / "drift-labels-dbt-shopify.jsonl").read_text().splitlines() if l]
     tier_a = [r for r in rows if r.get("category") in TIER_A]
 
     # Three outcomes, not two. Abstaining on the right column is not the same
@@ -110,13 +110,19 @@ def main() -> None:
     other_caught = [r for r in caught if r["category"] not in SCORED_AGAINST_D1]
 
     report = [
-        "# Benchmark: fivetran/dbt_shopify holdout",
+        "# Benchmark: fivetran/dbt_shopify",
         "",
         "> Regenerate with `python3 bench/run_shopify_bench.py <path-to-dbt_shopify-clone>`.",
         "",
         "Labels come from the upstream project's own documentation-fix commits, not from us.",
         "For each positive the drift window is reconstructed: the description as it stood at",
         "c1, against the columns the SQL produced at c2.",
+        "",
+        "**This is a benchmark, not a holdout.** The label miner was written before any",
+        "detector existed, but the scoring run then changed `detectors.py`: the branch",
+        "that treats a field description differently from a table description was chosen",
+        "because 9 of 10 identifier-change positives live there. See",
+        "[`docs/VALIDATION-INTEGRITY.md`](../docs/VALIDATION-INTEGRITY.md).",
         "",
         "## Where this detector applies",
         "",

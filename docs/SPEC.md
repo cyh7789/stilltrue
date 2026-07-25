@@ -1,8 +1,12 @@
 # SPEC 定稿 — Context Drift Sentinel
 
-> 合成自三路盲延伸（`runs/spec-{codex,claude,duo}-SPEC.md`，三路網路呼叫皆為 0）+ 主 session 補的第三方 holdout 驗證。
+> 合成自三路盲延伸（`runs/spec-{codex,claude,duo}-SPEC.md`，三路網路呼叫皆為 0）+ 主 session 補的第三方來源驗證。
 > 定稿日 2026-07-25。截止 2026-08-10 17:00 EDT ＝ 台北 2026-08-11 05:00，剩 16 天。
 > 三路原稿保留不動；本檔只記**採用哪一套與為什麼**，細節指回原稿。
+>
+> ⚠️ **本檔是設計紀錄，不是現況**。實作與規格的落差（D2/D4 未做、5 vs 7 工具、
+> 無 Review UI、凍結未執行）逐條列在 [`STATUS.md`](STATUS.md)；驗證誠信的部分
+> 見 [`VALIDATION-INTEGRITY.md`](VALIDATION-INTEGRITY.md)。§3.5 的凍結宣告已作廢。
 
 ## 0. 題目與賽道
 
@@ -72,13 +76,13 @@ claude 給了四條可測條件並明說「不憑印象指名 repo」，主 sess
 | 授權公開 | Apache/MIT/BSD | apache-2.0 ✅ |
 | description 數 | ≥ 50 | `models/shopify.yml` 單檔 **592** ✅ |
 | git 歷史 | ≥ 12 個月、≥ 200 commits | **428 commits**、2020-08→2026-07 ✅ |
-| 正負例 | 正 ≥30、負 ≥100 | 待 `mine_holdout.py` 執行（D2 驗證） |
+| 正負例 | 正 ≥30、負 ≥100 | 待 `mine_drift_labels.py` 執行（D2 驗證） |
 
 **標籤機制**（claude 原稿 §7.1）：挖 commit 對——`c1` 改了 model SQL 但沒改對應 yml description；`c2` 才補上文件。`c1..c2` 之間該 description 即 `drift=true`，類別由 diff 型態機械判定。**送進系統時只搬 `c1` 時點狀態進 DataHub，系統看不到 git**——git 只是 oracle 產地，agent 拿不到，天然防作弊。
 
 額外優勢：該 repo `models/rest/` 與 `models/graphql/` 兩套並存，正處遷移期，文件落後現實的密度高。
 
-### 3.3 第三方 holdout H-C3：NYC TLC（已驗證，完整清單見 `HOLDOUT-nyc-tlc.md`）
+### 3.3 第三方 holdout H-C3：NYC TLC（已驗證，完整清單見 `BENCHMARK-nyc-tlc.md`）
 
 35 個月全掃描（HTTP range read 讀 parquet footer，不需下載完整檔），僅兩次 schema 變動：
 
@@ -99,9 +103,17 @@ claude 給了四條可測條件並明說「不憑印象指名 repo」，主 sess
 
 指標：precision / recall（分 D1–D5）、citation validity、unsupported-claim rate、abstention rate、gate escape、unauthorized mutation、duplicate mutation、audit verify exit code。**第三方 holdout 不預設效果門檻**（codex 原稿：「以免看到自然標籤後移動門柱」），公開實際分母、confusion matrix 與逐筆結果。
 
-### 3.5 凍結宣告（提交時原文入 README）
+### 3.5 凍結宣告 —— ❌ 未執行，宣告作廢，不得放入提交物
 
-> System code, prompts, policies, and category definitions were frozen before the third-party sources were acquired. Expected labels were derived mechanically (NYC TLC: published parquet schemas; dbt_shopify: the upstream project's own documentation-fix commits), not authored by the project team. Holdout outcomes were not used to modify the frozen system.
+原訂在提交時把下列文字原文放進 README：
+
+> ~~System code, prompts, policies, and category definitions were frozen before the third-party sources were acquired. Expected labels were derived mechanically (NYC TLC: published parquet schemas; dbt_shopify: the upstream project's own documentation-fix commits), not authored by the project team. Holdout outcomes were not used to modify the frozen system.~~
+
+**D11 的凍結從未執行**，`freeze.json` 不存在，兩條來源的跑分結果都改過系統程式碼。
+上面第一句與第三句因此為假，只有中間那句（標籤機械導出）仍成立。
+事實時序與 commit 證據：[`VALIDATION-INTEGRITY.md`](VALIDATION-INTEGRITY.md)。
+
+本節保留原文是為了留下設計與實作的落差紀錄，不是待辦。
 
 ## 4. 可證明的審計 — 三路一致
 
@@ -145,6 +157,6 @@ evaluator 消費順序固定（規則明寫評審可只看文字與影片）：
 
 ## 8. 開工前未解
 
-1. `mine_holdout.py` 對 `fivetran/dbt_shopify` 的正負例產出量待實測（D2 驗證，不過門檻就換候選）
+1. `mine_drift_labels.py` 對 `fivetran/dbt_shopify` 的正負例產出量待實測（D2 驗證，不過門檻就換候選）
 2. TLC data dictionary 的歷史版本可及性未確認；取不到則以 2023-01 實際 schema 當 context 基準並在報告揭露
 3. D2 新鮮度偵測所需的「entity 最後更新時間戳」來源欄位名，需在 D1 環境搭起來後定案（duo 原稿列為情報缺口 1）

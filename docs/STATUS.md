@@ -24,22 +24,22 @@ Context Drift Sentinel：偵測 DataHub 裡「人寫的描述」與「schema／l
 
 ## 3. 實測數字
 
-### 第三方 holdout A：NYC TLC
+### 第三方 benchmark A：NYC TLC
 
 - 來源：TLC 官方公開 parquet，35 個月全掃描（`bench/oracles/scan_tlc.py`）
 - 標籤：兩份已發布 schema 的差集，非人工標註
 - 事件：2023-02 `airport_fee` → `Airport_fee`；2025-01 新增 `cbd_congestion_fee`
 - 結果：**2/2 偵測，0 誤報**
 
-### 第三方 holdout B：fivetran/dbt_shopify
+### 第三方 benchmark B：fivetran/dbt_shopify
 
-- 來源：428 commits 的 git 歷史（`bench/oracles/mine_holdout.py`）
+- 來源：428 commits 的 git 歷史（`bench/oracles/mine_drift_labels.py`）
 - 標籤：上游自己修文件的 commit 對
 - Tier A 40 筆（IDENTIFIER_CHANGE 10 + DEPRECATION 30），負例 2,496
 - 結果：**IDENTIFIER_CHANGE 9/10**；DEPRECATION 6/30，分開報告（30 筆中 17 筆的描述不含任何識別碼，該偵測器結構上不適用）
 - 已知失真：mart 模型用 `select *`，欄位無法從 SQL 原文重建
 
-### Baseline 對照（同一 holdout、同一輸入）
+### Baseline 對照（同一 benchmark、同一輸入）
 
 | Baseline | Recall | 誤報 |
 |---|---|---|
@@ -71,11 +71,11 @@ scan → 2 findings → apply → Gate passed → 寫回 DataHub → read-back V
 2. demo 影片未錄
 3. repo 為 private，未轉 public
 4. Devpost 表單未提交
-5. `mine_holdout.py` 對 mart 模型的 schema 重建不完整
+5. `mine_drift_labels.py` 對 mart 模型的 schema 重建不完整
 6. D5 需要真實查詢紀錄才有輸入；showcase-ecommerce 的 `get_dataset_queries` 回傳 total 為 0
 
 ## 7. 開發過程中修正的判斷
 
-- 描述來源：原僅讀 `properties.description`，導致 holdout 掃描回 0 findings。改為 editableProperties 優先後修正
+- 描述來源：原僅讀 `properties.description`，導致 TLC benchmark 掃描回 0 findings。改為 editableProperties 優先後修正
 - D1 誤報：原本所有無法解析的識別碼都報 DRIFT，25 張表產生 6 個誤判。改為需有改名候選才斷言，其餘棄權
 - dbt_shopify 跑分經三次修正（schema 取 c1 → 取 c2；描述掛表層 → 掛欄位層；被刪欄位的描述遭丟棄 → 補回），第三次由外部診斷指出

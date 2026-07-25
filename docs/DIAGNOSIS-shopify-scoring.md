@@ -10,7 +10,7 @@
 1. **跑分餵料 bug(主因)**:`bench/run_shopify_bench.py:60` 只在
    `c == r["column"]` 時掛描述;40 筆裡有 18 筆該欄位不在 c2 重建的 schema 裡,
    漂移描述被整個丟掉,偵測器根本沒看到文字。IDENTIFIER_CHANGE 的 9 筆無反應全在這裡。
-2. **schema 重建對 mart 模型失真**:`sql_columns_at`(`bench/oracles/mine_holdout.py:64`)
+2. **schema 重建對 mart 模型失真**:`sql_columns_at`(`bench/oracles/mine_drift_labels.py:64`)
    的 regex 只認 staging 風格 SQL;mart 模型用 `select *` + `dbt_utils.star()`,
    欄位根本不在 SQL 原文裡,抽出來的「schema」是殘缺的。
 3. **DEPRECATION 的標籤語意跟偵測器抓的東西不是同一件事**:30 筆裡 17 筆的 c1 描述
@@ -71,7 +71,7 @@ DEPRECATION 建議從這個偵測器的跑分裡拿掉。
 
 ## 機制 2:為什麼 18 筆的欄位「不在」c2 schema——schema 重建對 mart 模型失真
 
-`sql_columns_at`(`bench/oracles/mine_holdout.py:72-73`)只抓兩種樣態:
+`sql_columns_at`(`bench/oracles/mine_drift_labels.py:72-73`)只抓兩種樣態:
 `as alias` 與「4 格縮排、行尾逗號」的裸欄位。這是 staging 模型的慣例。
 
 實測 `shopify__customers.sql` @ c2(`/tmp/cds-diag/diag3.py`):
@@ -91,7 +91,7 @@ mart 模型的欄位來自上游展開,SQL 原文看不到。所以餵給偵測�
 
 ## 機制 3:DEPRECATION 標籤跟 detect_schema_break 抓的不是同一件事
 
-DEPRECATION 的定義(`bench/oracles/mine_holdout.py:98`)是
+DEPRECATION 的定義(`bench/oracles/mine_drift_labels.py:98`)是
 「c2 描述新增了 deprecat 字樣」——漂移的內容是**資訊缺席**
 (現實已棄用、文件還沒說),不是**過時的欄位引用**。
 

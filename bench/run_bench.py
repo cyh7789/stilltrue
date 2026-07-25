@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run every baseline against the NYC TLC holdout and write REPORT.md.
+"""Run every baseline against the NYC TLC benchmark and write REPORT.md.
 
 The expected set is not hand-written here: it comes from the diff between two
 published TLC parquet schemas (see oracles/tlc-drift-events.json), so the same
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / "src"))
 
-HOLDOUT_URN = "urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)"
+BENCHMARK_URN = "urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)"
 
 
 def expected_from_oracle() -> set[str]:
@@ -55,19 +55,19 @@ def main() -> None:
     expected = expected_from_oracle()
 
     with ReadOnlyDataHubAdapter(server=server) as adapter:
-        entity, _ = adapter.get_entity(HOLDOUT_URN)
-        schema, _ = adapter.list_schema_fields(HOLDOUT_URN)
+        entity, _ = adapter.get_entity(BENCHMARK_URN)
+        schema, _ = adapter.list_schema_fields(BENCHMARK_URN)
 
     description = authored_description(entity)
     fields = schema.get("fields", [])
     if not fields:
-        print("holdout not loaded; run bench/oracles/build_tlc_holdout.py first")
+        print("benchmark not loaded; run bench/oracles/build_tlc_benchmark.py first")
         sys.exit(1)
 
-    scored = evaluate(description, fields, HOLDOUT_URN, expected)
+    scored = evaluate(description, fields, BENCHMARK_URN, expected)
 
     lines = [
-        "# Benchmark: NYC TLC holdout",
+        "# Benchmark: NYC TLC",
         "",
         f"> Generated {datetime.now(timezone.utc).isoformat(timespec='seconds')} "
         f"by `bench/run_bench.py`. Rerun it to reproduce every number below.",
@@ -78,6 +78,12 @@ def main() -> None:
         "published parquet schemas for 2023-01 and 2025-01, extracted by",
         "`oracles/scan_tlc.py`. Anyone can rerun that script and get the same two",
         "events without running this project at all.",
+        "",
+        "**This is a benchmark, not a holdout.** It was run during development and",
+        "the results changed the code -- this scan returning nothing is what",
+        "surfaced the `editableProperties` bug. See",
+        "[`docs/VALIDATION-INTEGRITY.md`](../docs/VALIDATION-INTEGRITY.md) for the",
+        "timeline and the frozen-holdout claim that was withdrawn.",
         "",
         f"**Denominator:** {len(fields)} fields in the dataset, of which "
         f"{len(fields) - len(expected)} must produce no finding.",
@@ -113,7 +119,7 @@ def main() -> None:
         "",
         "```bash",
         "datahub docker quickstart",
-        "python3 bench/oracles/build_tlc_holdout.py   # loads the holdout from public data",
+        "python3 bench/oracles/build_tlc_benchmark.py   # loads the benchmark from public data",
         "python3 bench/run_bench.py                   # regenerates this file",
         "```",
     ]

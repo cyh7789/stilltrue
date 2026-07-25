@@ -79,6 +79,6 @@ position where the chain breaks.
 
 ```bash
 datahub docker quickstart
-python3 bench/oracles/build_tlc_holdout.py   # loads the dataset from public TLC data
+python3 bench/oracles/build_tlc_benchmark.py   # loads the dataset from public TLC data
 sentinel scan --urn "urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)"
 ```

@@ -1,10 +1,16 @@
-# Benchmark: fivetran/dbt_shopify holdout
+# Benchmark: fivetran/dbt_shopify
 
 > Regenerate with `python3 bench/run_shopify_bench.py <path-to-dbt_shopify-clone>`.
 
 Labels come from the upstream project's own documentation-fix commits, not from us.
 For each positive the drift window is reconstructed: the description as it stood at
 c1, against the columns the SQL produced at c2.
+
+**This is a benchmark, not a holdout.** The label miner was written before any
+detector existed, but the scoring run then changed `detectors.py`: the branch
+that treats a field description differently from a table description was chosen
+because 9 of 10 identifier-change positives live there. See
+[`docs/VALIDATION-INTEGRITY.md`](../docs/VALIDATION-INTEGRITY.md).
 
 ## Where this detector applies
 

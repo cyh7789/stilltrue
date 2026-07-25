@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Load the NYC TLC holdout into DataHub.
+"""Load the NYC TLC benchmark into DataHub.
 
 Two states of the same dataset, taken from published parquet schemas:
 
@@ -13,7 +13,7 @@ Expected findings fall out of the diff between the two published schemas, so no
 human labelled anything here.
 
 Usage:
-  python3 build_tlc_holdout.py [--server http://localhost:8080]
+  python3 build_tlc_benchmark.py [--server http://localhost:8080]
 """
 
 from __future__ import annotations

@@ -48,6 +48,12 @@ CLI**: its judge is injected rather than built in, so the module itself makes no
 network calls and can be tested against a fake. Connecting a real LLM judge is
 the remaining step — see `src/sentinel/semantic.py`.
 
+The gaps in the numbering are deliberate and worth stating plainly. The design
+enumerated five drift families; **D2 (freshness drift — a description claiming a
+refresh cadence the data no longer keeps) and D4 (ownership drift) are not
+implemented.** They are not hidden behind an abstraction waiting to be filled in;
+there is no code for them. What ships is D1, D3 and an unwired D5.
+
 ## Quickstart
 
 ```bash
@@ -80,9 +86,13 @@ read-only adapter ──→ deterministic detectors ──→ proposal ──→
 
 Three properties this buys, each of which is a real failure being prevented:
 
-**The model cannot reach a write.** The adapter wraps exactly five read tools
-from the Agent Context Kit. The mutation tools aren't imported in that module at
-all — writes live in a separate module behind a separate credential.
+**The model cannot reach a write.** The adapter wraps five read tools from the
+Agent Context Kit — `get_entities`, `list_schema_fields`, `get_lineage`,
+`get_dataset_queries`, `grep_documents`. The Kit also offers `search` and
+`search_documents`; neither is wrapped, because scope arrives as a URN list or a
+`--limit`, so nothing in the detector path needs to search. The mutation tools
+aren't imported in that module at all — writes live in a separate module behind a
+separate credential.
 
 **Every claim carries a citation.** Each observation becomes an evidence record
 addressed by its content hash. The Policy Gate rejects any proposal citing an
@@ -113,12 +123,23 @@ similarly named replacement, now reads as abstention rather than drift.
 
 ## Evidence
 
-Two holdouts, neither of them labelled by us:
+Two third-party benchmarks, neither of them labelled by us:
 
-| Holdout | Tests | Result | Where the labels come from |
+| Benchmark | Tests | Result | Where the labels come from |
 |---|---|---|---|
 | NYC TLC trip records | docs vs data | **2/2**, 0 false positives | the diff between two published parquet schemas |
 | [`fivetran/dbt_shopify`](https://github.com/fivetran/dbt_shopify) | docs vs code | **9/10** on identifier changes | the upstream project's own documentation-fix commits |
+
+**These are benchmarks, not holdouts, and the difference matters.** Both were run
+during development and both changed the code: the TLC scan returning nothing is
+what surfaced the `editableProperties` bug, and a branch condition in
+`detectors.py` was set from the dbt_shopify score. A benchmark that shaped the
+rules measures fit, not transfer. The full timeline with commit hashes — including
+the frozen-holdout claim we withdrew — is in
+[`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
+
+What survives the correction: the labels are still not ours, the denominators are
+still public, and the bad numbers are still reported.
 
 The dbt_shopify number is deliberately split by category
 ([`bench/SHOPIFY-REPORT.md`](bench/SHOPIFY-REPORT.md)). This detector compares
@@ -133,15 +154,15 @@ a model's SQL without touching the matching description, and the later commit
 where a human finally fixed the wording. Everything between those two commits is
 drift, labelled by the maintainers' own behaviour rather than by us. Only the
 mechanically decidable categories (identifier changes, deprecation notices) count
-toward the headline numbers; see [`bench/oracles/HOLDOUT-REPORT.md`](bench/oracles/HOLDOUT-REPORT.md)
+toward the headline numbers; see [`bench/oracles/MINING-REPORT.md`](bench/oracles/MINING-REPORT.md)
 for what was filtered out and why we stopped filtering.
 
-The TLC holdout needs no human labelling at all: run `bench/oracles/scan_tlc.py`
+The TLC benchmark needs no human labelling at all: run `bench/oracles/scan_tlc.py`
 and the two events fall out of the published schemas.
 
 ### Does this actually need a context platform?
 
-Same holdout, same inputs, four approaches ([`bench/REPORT.md`](bench/REPORT.md),
+Same benchmark, same inputs, four approaches ([`bench/REPORT.md`](bench/REPORT.md),
 regenerate with `python3 bench/run_bench.py`):
 
 | Baseline | Recall | False positives | Missed |

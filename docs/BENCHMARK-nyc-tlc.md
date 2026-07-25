@@ -1,4 +1,8 @@
-# 第三方 Holdout 設計 — NYC TLC Trip Records
+# 第三方 Benchmark 設計 — NYC TLC Trip Records
+
+> ⚠️ 本文原題為「第三方 Holdout 設計」。開發過程中系統程式碼依此來源的跑分結果修改過，
+> 因此它是**第三方 benchmark，不是 holdout**。§6 的凍結宣告已撤回。
+> 事實時序：[`VALIDATION-INTEGRITY.md`](VALIDATION-INTEGRITY.md)。
 
 > 驗證日 2026-07-25，由主 session 執行（盲跑 agent 無網路，三路 SPEC 均把此項標為情報缺口或改用主辦提供的 datapack 代替）。
 > 對應 SKILL.md Grand 級三件套第 1 件：「找一個你沒碰過的未改動外部系統／公開資料集／學術基準當驗證集 — 自建情境集只到 $1K-3K 級」。
@@ -22,7 +26,7 @@
 | TLC 官方 data dictionary（Yellow） | `https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf` | HTTP 200 |
 | 實際資料檔（月度 parquet） | `https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_<YYYY-MM>.parquet` | HTTP 200 |
 
-兩者由紐約市政府與 TLC 發布，公開下載，不需認證。DataHub 官方 `nyc-taxi` datapack 使用的即是這份資料來源（BRIEF §8.5：「NYC Yellow Taxi Trip Records（約 500k trips）」），因此評審對資料集本身有既有認識，但本 holdout 使用的是**原始來源**，不是主辦包裝過的 datapack。
+兩者由紐約市政府與 TLC 發布，公開下載，不需認證。DataHub 官方 `nyc-taxi` datapack 使用的即是這份資料來源（BRIEF §8.5：「NYC Yellow Taxi Trip Records（約 500k trips）」），因此評審對資料集本身有既有認識，但本 benchmark 使用的是**原始來源**，不是主辦包裝過的 datapack。
 
 ## 3. 已驗證的真實漂移（實測，非推論）
 
@@ -41,14 +45,17 @@
 
 ## 4. 相對於前述兩個 datapack 的三個優勢
 
-1. **真第三方、未改動**：漂移由 TLC 自己造成，發生在本專案存在之前，不可能被我們的偵測邏輯反向設計。徹底避開循環驗證（CASES.md 敗因 2）。
+1. **真第三方、未改動**：漂移由 TLC 自己造成，發生在本專案存在之前，不可能被我們的偵測邏輯反向設計。
+   ⚠️ 但這只擋掉一半的循環驗證：**事件本身**沒被反向設計，**偵測規則**卻是對著這份結果調的
+   （見 §6 與 [`VALIDATION-INTEGRITY.md`](VALIDATION-INTEGRITY.md)）。要完全擋掉需要凍結程序。
 2. **ground truth 機械可驗證，不需人工標註**：期望答案由兩個月份的 parquet schema 差集直接算出，不依賴單一 steward 的主觀判斷。codex SPEC 中「人工 gold 一致性」的情報缺口在此不存在。
 3. **評審可一鍵重現**：兩個 URL 加一段 `read_schema` 即可獨立複驗，不需要跑我們的系統。
 
 ## 5. 使用方式
 
 - **開發集**：官方 `nyc-taxi`、`healthcare`、`showcase-ecommerce` datapack（BRIEF §8.5 明示 safe for Apache 2.0 submissions），用於功能開發與五類漂移的 recall 調校。
-- **凍結 holdout**：TLC 原始來源。系統程式碼、prompt、policy、分類定義全部凍結後，才第一次載入。
+- **第三方 benchmark**：TLC 原始來源。原訂「系統全部凍結後才第一次載入」，實際未照此執行——
+  見 §6。
 
 建置步驟：
 
@@ -60,9 +67,22 @@
    - 其餘 18 個欄位：無漂移（陰性對照，用於量測誤報率）
 4. 分母公開：20 個欄位中 2 個應偵測、18 個應保持沉默。誤報率與召回率同時可算。
 
-## 6. 凍結宣告（提交時原文放入 report）
+## 6. 凍結宣告——已撤回
 
-> System code, prompts, policies, and category definitions were frozen before the NYC TLC source was acquired. Expected labels were derived mechanically from the published parquet schemas of 2023-01 and 2025-01, not authored by the project team. Holdout outcomes were not used to modify the frozen system.
+這一節原本放著一段準備原文貼進提交物的宣告，內容是「系統程式碼、prompt、policy、
+分類定義在取得 TLC 來源前已全部凍結」與「holdout 結果未用於修改已凍結的系統」。
+
+**那段陳述不成立，已刪除而非改寫。** `authored_description()` 就是因為 TLC 掃描回
+0 findings 才加的（commit `457b190`），同一個 commit 的 D1 收緊規則也拿 TLC 的 2/2
+當驗收條件。完整時序與 commit 證據見 [`VALIDATION-INTEGRITY.md`](VALIDATION-INTEGRITY.md)。
+
+可保留的只有標籤來源這半句：
+
+> Expected labels were derived mechanically from the published parquet schemas of
+> 2023-01 and 2025-01, not authored by the project team.
+
+這句仍為真——任何人跑 `bench/oracles/scan_tlc.py` 都會得到同樣兩個事件，不需要跑本專案。
+但它證明的是「標籤不是我們編的」，不是「系統沒看過答案」。後者需要凍結程序，本專案尚未做。
 
 ## 7. 完整漂移事件清單（2023-01 至 2025-11 全掃描，已完成）
 
