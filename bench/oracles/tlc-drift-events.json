@@ -1,0 +1,22 @@
+[
+  {
+    "month": "2023-02",
+    "added": [
+      "Airport_fee"
+    ],
+    "removed": [
+      "airport_fee"
+    ],
+    "case_rename": [
+      "airport_fee->Airport_fee"
+    ]
+  },
+  {
+    "month": "2025-01",
+    "added": [
+      "cbd_congestion_fee"
+    ],
+    "removed": [],
+    "case_rename": []
+  }
+]
