@@ -5,7 +5,7 @@ SERVER ?= http://localhost:8080
 TLC_URN = urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)
 SHOPIFY ?= /tmp/dbt_shopify
 
-.PHONY: help demo bench-replay test datahub-up load-benchmark clean
+.PHONY: help demo bench-replay test check-claims datahub-up load-benchmark clean
 
 help:
 	@echo "make datahub-up       start a local DataHub (takes a few minutes the first time)"
@@ -13,6 +13,7 @@ help:
 	@echo "make demo             scan -> refuse an unapproved write -> approve -> write back -> verify"
 	@echo "make bench-replay     re-run every baseline and regenerate bench/REPORT.md"
 	@echo "make test             unit tests"
+	@echo "make check-claims     every number in the docs, against the file it came from"
 
 datahub-up:
 	datahub docker quickstart
@@ -30,6 +31,9 @@ bench-replay:
 	@echo
 	@echo "dbt_shopify needs a local clone; set SHOPIFY=<path> to include it."
 	@test -d "$(SHOPIFY)" && python3 bench/run_shopify_bench.py "$(SHOPIFY)" || true
+
+check-claims:
+	python3 scripts/check_claims.py
 
 test:
 	python3 -m pytest -q
