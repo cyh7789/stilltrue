@@ -17,6 +17,7 @@ from typing import Any, Literal
 DriftCategory = Literal[
     "D1_SCHEMA_BREAK",      # a description references a field that no longer exists
     "D1_UNDOCUMENTED",      # the field exists but nobody documented it
+    "D1_ORPHANED_DOC",      # a description is attached to a field that no longer exists
     "D3_LINEAGE_DRIFT",     # a claimed source is not among the actual upstreams
 ]
 
@@ -337,6 +338,48 @@ def _undocumented_findings(
             evidence_ids=list(evidence_ids),
         )
         for f in missing
+    ]
+
+
+def detect_orphaned_docs(
+    entity_urn: str,
+    authored_fields: dict[str, str],
+    schema_fields: set[str],
+    evidence_ids: list[str],
+) -> list[Finding]:
+    """Documentation attached to a field the dataset no longer has.
+
+    The purest form of this problem and the one nobody can see. Someone
+    documents a column through the UI and the text lands in
+    `editableSchemaMetadata`. The pipeline later stops producing that column,
+    which rewrites `schemaMetadata` and never touches the editable aspect. The
+    description stays, attached to nothing.
+
+    DataHub does not clean it up, and the UI cannot show it -- there is no
+    column left to render it on. It is still in the graph, so every agent
+    reading the catalog is handed documentation for a field that does not
+    exist. Verified end to end on a quickstart: document two columns, drop one,
+    and its description is still there afterwards.
+
+    No prose is parsed here. The field either is in the schema or it is not.
+    """
+    if not schema_fields:
+        # Nothing was read, which is not the same as everything being gone.
+        return []
+
+    return [
+        Finding(
+            entity_urn=entity_urn,
+            category="D1_ORPHANED_DOC",
+            verdict="DRIFT",
+            subject=field_path,
+            claim=f"`{field_path}` is documented: {description.strip()!r}",
+            reality=f"the schema has no `{field_path}`; this documentation is attached to "
+                    f"a field that no longer exists and is not visible in the UI",
+            evidence_ids=list(evidence_ids),
+        )
+        for field_path, description in sorted(authored_fields.items())
+        if field_path not in schema_fields and (description or "").strip()
     ]
 
 

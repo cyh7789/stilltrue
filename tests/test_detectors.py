@@ -293,3 +293,56 @@ def test_a_field_that_came_back_is_not_vanished():
          "description": "newly added field 'amount'"},
     ]
     assert vanished_fields(events, current={"amount"}) == {}
+
+
+# --- Documentation left attached to a field that no longer exists -----------
+# The purest form of the problem, and the one nobody can see. A human documents
+# a column through the UI; that text lands in editableSchemaMetadata. The
+# pipeline later drops the column, which rewrites schemaMetadata and never
+# touches the editable aspect. The description stays, attached to nothing.
+# DataHub does not clean it up and the UI does not render it -- the field is
+# gone, so there is no row to show it on -- but it is still in the graph and
+# every agent reading the catalog gets it.
+
+from stilltrue.detectors import detect_orphaned_docs  # noqa: E402
+
+
+def test_a_description_on_a_removed_field_is_orphaned():
+    found = detect_orphaned_docs(
+        DBT_URN,
+        authored_fields={"order_id": "Order id", "legacy_total": "Total before the 2024 rewrite"},
+        schema_fields={"order_id", "customer_id"},
+        evidence_ids=["ev"],
+    )
+    assert [f.subject for f in found] == ["legacy_total"]
+    assert found[0].verdict == "DRIFT"
+    assert "Total before the 2024 rewrite" in found[0].claim
+
+
+def test_documentation_on_live_fields_is_not_reported():
+    assert detect_orphaned_docs(
+        DBT_URN,
+        authored_fields={"order_id": "Order id"},
+        schema_fields={"order_id", "customer_id"},
+        evidence_ids=["ev"],
+    ) == []
+
+
+def test_an_empty_description_is_not_orphaned_documentation():
+    """A blank entry is a leftover key, not something a human wrote."""
+    assert detect_orphaned_docs(
+        DBT_URN,
+        authored_fields={"legacy_total": "   "},
+        schema_fields={"order_id"},
+        evidence_ids=["ev"],
+    ) == []
+
+
+def test_an_empty_schema_abstains_rather_than_flagging_everything():
+    """No schema read means no evidence; it must not read as 'every field is gone'."""
+    assert detect_orphaned_docs(
+        DBT_URN,
+        authored_fields={"order_id": "Order id"},
+        schema_fields=set(),
+        evidence_ids=["ev"],
+    ) == []

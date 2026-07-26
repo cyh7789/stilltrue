@@ -23,7 +23,8 @@ from typing import Optional
 import typer
 
 from .adapter import ReadOnlyDataHubAdapter, authored_description
-from .detectors import detect_lineage_drift, detect_schema_break, vanished_fields
+from .detectors import (detect_lineage_drift, detect_orphaned_docs,
+                        detect_schema_break, vanished_fields)
 from .executor import WriteExecutor
 from .ledger import AuditLedger
 from .proposal import PolicyGate, Proposal, check_approval
@@ -99,6 +100,17 @@ def scan(
 
             found = detect_schema_break(u, description, fields, evidence_ids,
                                         vanished=vanished)
+
+            # Documentation attached to fields the schema no longer has. Read
+            # from the editable aspect directly, because the whole point is
+            # that it can name fields the schema does not.
+            try:
+                authored, ev_authored = adapter.authored_field_descriptions(u)
+                found += detect_orphaned_docs(
+                    u, authored, {f.get("fieldPath", "") for f in fields},
+                    evidence_ids + [ev_authored])
+            except Exception:
+                pass
 
             try:
                 lineage, ev_lineage = adapter.get_lineage(u)

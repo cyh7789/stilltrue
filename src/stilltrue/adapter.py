@@ -118,6 +118,16 @@ class ReadOnlyDataHubAdapter:
             ]
         return payload, self._record(urn, "list_schema_fields", payload)
 
+    def authored_field_descriptions(self, urn: str) -> tuple[dict[str, str], str]:
+        """Every field description a human wrote, keyed by fieldPath.
+
+        Read separately from the schema on purpose: this aspect can name fields
+        the schema no longer has, and that gap is exactly what
+        `detect_orphaned_docs` looks for. Joining the two here would hide it.
+        """
+        authored = self._editable_field_descriptions(urn)
+        return authored, self._record(urn, "get_entities", {"editableSchemaFieldInfo": authored})
+
     def _editable_field_descriptions(self, urn: str) -> dict[str, str]:
         """fieldPath -> the description someone wrote through the UI or API."""
         import json
