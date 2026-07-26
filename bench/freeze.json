@@ -1,0 +1,31 @@
+{
+  "frozen_at": "2026-07-26T03:21:59+00:00",
+  "git_commit": "f1661c0e7d0e9e15f9df325974953d60e0076d6c",
+  "files": {
+    "src/stilltrue/detectors.py": "841234a7ca662067b9b4025a7e8ed3061e597ce40ca01d0733f0845b58e79702",
+    "src/stilltrue/adapter.py": "6631433b4b67532aa872f0f305796ec03109914a3fd3aef1748e568a454a4457",
+    "src/stilltrue/evidence.py": "75a7085c5da9acb3805815268b40666d4365dc3633aa0c906ef61afbbea6484d",
+    "bench/oracles/mine_drift_labels.py": "73b96b41dd64cd55f67cc16e696bc2b2171177d7003a61fff855b27c37f95069",
+    "bench/run_shopify_bench.py": "7e9836a4fb1f0d31e0d7da1c362c12dd3f460f1daa32b631d6e7460a182532a7"
+  },
+  "selection_rule": {
+    "population": "public repositories under github.com/fivetran whose name starts with 'dbt_'",
+    "exclude": [
+      "dbt_shopify and any dbt_shopify_* variant -- already used as a development benchmark",
+      "repositories archived at selection time"
+    ],
+    "order": "alphabetical by repository name",
+    "take": "the first repository satisfying every threshold below",
+    "thresholds": {
+      "license": "Apache-2.0, MIT or BSD",
+      "commits": ">= 200",
+      "history_months": ">= 12",
+      "column_descriptions": ">= 50",
+      "mined_positives": ">= 30",
+      "mined_negatives": ">= 100"
+    },
+    "runs_allowed": 1,
+    "on_result": "published as measured; the frozen files are not modified in response"
+  },
+  "note": "NYC TLC and fivetran/dbt_shopify are development benchmarks and are NOT covered by this freeze -- both shaped the code before it existed. See docs/VALIDATION-INTEGRITY.md."
+}
