@@ -1,112 +1,119 @@
 # StillTrue（Build with DataHub: The Agent Hackathon）— 接手紀錄
 
-> 更新 2026-07-26（第二輪審查後）。截止 2026-08-10 17:00 EDT ＝ 台北 8/11 05:00，剩 15 天。
-> 前身 Serow / Blast-Radius Guard 已封存（`cyh7789/blast-radius-guard`，archived）。
-> 本作是重做，不複用舊程式碼。
+> 更新 2026-07-26，核心重建後。截止 2026-08-10 17:00 EDT ＝ 台北 8/11 05:00。
+> repo `cyh7789/stilltrue`（private）。前身 Serow / Blast-Radius Guard 已封存。
 
 ## 一句話
 
-偵測 DataHub 裡「人寫的描述」與「schema／lineage 現實」脫節之處，附證據提出修正，
-經核准後寫回 graph。投賽道 Agents That Do Real Work。
+DataHub 裡人寫的文件與 schema 現實脫節之處，證據取自 DataHub 自己的變更帳本，
+附證據提出修正，經人確認後寫回 graph。投賽道 Agents That Do Real Work。
 
-對外名、套件名、CLI 命令均為 **stilltrue**（repo `cyh7789/stilltrue`，private）。
+## ⚠️ 先讀這段：核心已經整個換過
 
-## 為什麼是這題（決策依據）
+**舊設計（已死）**：用正則從描述裡撈出「看起來像欄位名」的 token，
+再用字串相似度猜有沒有被改名。四輪加標記清單修誤報，每個新語料都冒出新形式。
+跨三個語料的成績是 **120 次斷言、17 次對**。
 
-r2 三路盲跑（補上企業敘事層後）獨立收斂到同一家族，duo 與 claude 甚至取了相同題名。
-關鍵斜角一句話（claude ROUTE）：**別人做「用 context 讓 agent 變可靠」，
-得獎的形狀是「用 agent 讓 context 保持可信」。**
+**現在的設計**：問 DataHub 什麼變了。斷言需要「這個 token 曾是這張表的欄位」的證據：
+現況 schema 有近似欄位（改名），或變更帳本記錄它離開（刪除）。其餘一律棄權。
 
-差異化錨點：官方 Learning Center 有篇文章叫
-「Continuous Context: Why Your AI Documentation Is Already Lying to You」，
-而開源側零工具。`/datahub-audit` 那族（5 個競爭 PR）測的是「還沒寫什麼」，
-本作讀「已經寫好的」並檢查是否還成立。
+`detectors.py` 裡**零英文詞組清單**。列舉值、鄰表名、實體型別、未展開 Jinja
+不會出現在 schema 變更帳本裡，所以一條排除規則都不用寫。
 
-## 現況
+換設計的原因寫在 memory 的 `survey-platform-surface-before-building`：
+我沒先把 DataHub 的能力面列完就開工，花四輪重造它已經publish的東西。
 
-8 commit、34 測試綠。模組：adapter（唯讀 5 工具）、evidence（內容定址 id）、
-detectors（D1/D3 確定性）、semantic（D5，判讀器注入式）、proposal + PolicyGate、
-executor（寫前重讀／冪等／寫後回讀）、ledger（hash 鏈）、cli。
+## 兩個偵測器
 
-實測數字：
-- NYC TLC：2/2，0 誤報（2023-02 `airport_fee`→`Airport_fee`、2025-01 新增 `cbd_congestion_fee`）
-- fivetran/dbt_shopify：IDENTIFIER_CHANGE 9/10；DEPRECATION 6/30（結構上不適用，分開報）
-- showcase-ecommerce 25 表：schema-break 誤報 0（收緊前 6）
-- baseline：B0 無 context 0/2、B1 覆蓋率 1/2、B2 大小寫不敏感 0/2、本作 2/2
-- 端到端閉環已實際執行（非 dry-run），證據在 `examples/tlc-rename/`
+| | 抓什麼 | 證據來源 |
+|---|---|---|
+| `D1_SCHEMA_BREAK` | 描述**文字裡提到**已消失的欄位 | timeline 變更帳本 ／ 現況 schema 近似比對 |
+| `D1_ORPHANED_DOC` | 描述**掛在**已消失的欄位上 | `editableSchemaMetadata` vs 現況 schema |
 
-上游 PR（L4）：
-- datahub-project/datahub **#18622** — 公開 `resolve_description()`，CI 全綠
-- datahub-project/datahub-skills **#49** — `datahub-context-drift` skill
+第二個是修 oracle 才發現的缺口。它抓的東西**今天沒有任何介面看得見**：
+DataHub 不清理、UI 沒有欄位可以渲染、Agent Context Kit 整個 aspect 丟掉。
 
-## 待辦
+## 實測數字（2026-07-26 重跑確認）
 
-**已完成（2026-07-26）**：D2 結案、Originality 證據、凍結 holdout ×2、修兩類誤報、四類 agent 對位。
-
-**剩下唯一一件：提交消費面**（約 4 天，效益最大，也是最弱的一條）
-- 影片 2 天。素材現成：demo 的 NOT_APPROVED / STALE 兩顆鏡頭、`airport_fee` 由 DRIFT 轉 CURRENT
-- L3 可見證據：URN 清單 + DataHub UI 截圖（唯一還沒產出的評審可見證物）
-- repo 轉 public + About 區 Apache-2.0 檢查
-- Devpost 送件。**不要勾** Feedback Survey 獎——與其他獎互斥
-
-⚠️ **凍結 v2 生效中**（commit `954415d`）。再動 `detectors.py` / `adapter.py` /
-`evidence.py` / `mine_drift_labels.py` / `run_shopify_bench.py` 任一個，
-`bench/freeze.py --check` 就會紅，v2 holdout 那 4/12 的可信度跟著沒。
-要改就得跑第三輪：修 → 重凍結 → 換新來源單跑（v1→v2 就是這樣走的，流程已驗證可重複）。
-
-## 兩個 holdout 的最終數字
-
-| 來源 | recall | 誤報 | 身分 |
+| 偵測器 | 語料 | 結果 | 身分 |
 |---|---|---|---|
-| dbt_shopify | 7/10（70%） | 2.17% | 開發 benchmark |
-| dbt_fivetran_log | **13/32（41%）** | 9.59% | 凍結 holdout v1 |
-| dbt_hubspot | **4/12（33%）** | 13.78% | 凍結 holdout v2 |
+| schema break | NYC TLC 27 個月真實發布歷史 | 27/27 月精確、0 誤報 | 開發 benchmark |
+| orphaned doc | dbt_hubspot | 4/4、432 負例 0 誤報 | 開發驗證 |
+| orphaned doc | **dbt_iterable** | **2/2、199 負例 0 誤報** | **凍結 holdout，單跑** |
 
-**兩個獨立 holdout 一致：野外 recall 是開發數字的三分之一到一半。**
-一個可能是運氣，兩個是性質。這是全案最強的一張牌——多數參賽作品只會報開發數字。
+57 測試綠。`bench/freeze.py --check` 綠（6 檔，凍結於 commit `ca13e88`）。
 
-## 六份外部意見（都在 repo 裡）
+⚠️ TLC 27/27 是稍早跑的，**這輪沒重跑**——重跑要重新 ingest 27 個月的 parquet，
+而 TLC 的 CDN 目前對本機回 403 限流。結果在 `bench/tlc-replay-results.jsonl`。
 
-審查四份：`docs/REVIEW-r1-{codex,duo}.md`、`docs/REVIEW-r2-{codex,duo}.md`。
-第二意見兩份：`docs/CONSULT-{fable,opus5}.md`——對三個已拍板決定的複核，
-Fable 推翻了「不修那兩類失敗」（凍結規則約束的是不因結果**重評同一來源**，不是不准改進產品），
-兩路都指出 README 首屏該讓方法打頭而非數字裸打頭。
-第二輪讓兩路各自複核自己第一輪的發現——`captured_at` 那個誤判就是由犯錯的那一路自己撤回的。
+⚠️ 兩個誠實註記已寫進報告：holdout 只有 2 個正例（證明機制可轉移，不證明比率）；
+選源門檻仍用舊 oracle 評估，分母只有 2 就是這個不一致的顯影。
 
-⚠️ **派 duo 的兩個前置條件**（踩過兩次才發現）：工作目錄必須是 git repo（`git init` + 一次 commit），
-且必須存在 `.claude/rules/` 目錄，否則初始化就靜默死掉，run.log 只留一行 bun 警告。
+## 三支上游 PR（全部 open、mergeable）
 
-## 第二輪的關鍵判定
+| PR | repo | 內容 |
+|---|---|---|
+| **#18622** | datahub | dataset 層描述解析（`resolve_description()`） |
+| **#18628** | datahub | 欄位層 editable 描述——Kit 抓了資料、刪掉、從沒合併。docstring 承諾的行為不存在 |
+| **#49** | datahub-skills | skill 改成變更帳本做法，含兩個踩過的坑 |
 
-| 項目 | 判定 |
-|---|---|
-| 凍結宣告撤回 | **誠實面已關閉**（duo：「教科書等級」）；證據面仍空，需第 2 項 |
-| 第三方 holdout | **仍是空的**，不是打折——揭露不會把 benchmark 變回 holdout |
-| `--approve` 核准閘 | 關掉「核准後偷換內容」（質變），**沒關掉核准者身分**。已把用詞全數降級 |
-| CURRENT 三態 | 補足宣稱，不是湊規格 |
-| 最弱 | **Submission Quality**，仍接近零 |
-| 最危險 | 從 Technical Execution 換成 **Originality**——唯一一條目前拿不出任何肯定證據的 |
+CI 狀態未查、維護者尚未審。#18628 動的是 397 個測試依賴的共用檔，要盯 CI。
 
-Originality 危險的理由：`b2_datahub_native` 對照不存在、D5 停擺後「第五類 agent」只剩敘事。
-評審席上坐著 Nick Adams（四類 agent 清單作者）與 Maggie Hays（DataHub Founding PM），
-「這跟我們現成的 Quality skill 差在哪」是他們職務上必然會問的，而現在的答案是空白。
+## 平台上的三個發現（提交敘事可用）
 
-## 開發中踩過的坑（別再犯）
+1. **Timeline 有，agent 碰不到。** 九個分類，寫在 skills repo 自己的 agent CLI 參考裡，
+   但五個 skill 零使用、Kit 三十八個匯出符號裡沒有。
+2. **DataHub 的 schema differ 是按位置比對。** 同一版同時刪欄、改名、換型別就會吐出
+   沒發生過的改名（`RatecodeID to Airport_fee`）。自我修正：被宣稱改名走的欄位還在 schema 裡，
+   用現況過濾就只剩真的。
+3. **孤兒描述沒有任何介面看得見**（見上）。
 
-1. **DataHub 有兩個描述欄位**：`properties`（ingestion）與 `editableProperties`（UI／API），
-   UI 顯示後者。只讀前者導致掃描回 0 findings，追三輪才發現。已抽成
-   `authored_description()`，並回饋上游 PR #18622。
-2. **不要把兩側都 lower() 再比對**：那會抹掉大小寫改名這個要抓的訊號。
-   第一版就是這樣寫的，TLC 測試抓到。
-3. **`__pycache__` 殘留**會讓修正看起來沒生效，白追三輪。
-4. **benchmark 難在重建「那個時間點的世界」**：dbt_shopify 跑分連錯三次
-   （schema 取 c1 而非 c2；描述掛表層而非欄位層；被刪欄位的描述遭丟棄）。
-   第三次是外部診斷指出的，紀錄在 `docs/DIAGNOSIS-shopify-scoring.md`。
-5. **卡關要派 duo 診斷**，不要自己硬修——我自己修兩輪都沒修到點上。
-6. **set 迭代順序隨 PYTHONHASHSEED 變**：finding id 依位置編號，examples 連續三次重生
-   拿到三個不同 id。同一個 process 內測不出來，回歸測試要跨子程序跑不同 seed。
-7. **只報 recall 不報 precision 等於宣稱了沒寫下來的東西**：dbt_shopify 的 2,496 筆負例
-   躺在標籤檔裡從沒跑過，補測是 4.5% 誤報（87/1,933），成因是描述列舉「值」而非欄位。
+## 舊語料為何撤下
+
+`dbt_shopify` / `dbt_fivetran_log` / `dbt_hubspot` 在舊設計下的數字全部撤下。
+舊 oracle 標的是「描述後來被編輯過」，那是文件編輯行為。
+`dbt_shopify` 10 筆 IDENTIFIER_CHANGE 正例裡，**9 筆的被引用 token 在漂移窗兩端
+都不是該 model 的欄位**——是列舉值（`fixed_amount`）與上游 model 名。
+舊偵測器正是打到那些才算命中，標籤型 oracle 對「因錯誤理由給出正確判定」也記一分。
+
+新 oracle（`mine_orphaned_docs.py`）標的是可機械判定的：
+欄位離開 model 的 SQL、它的 yml 描述還留著。
+
+## 剩下的
+
+**全部是把已有的東西變成評審看得到的**：
+
+- L3 可見證據：受影響 URN 清單 + DataHub UI 截圖／錄影
+- 影片（素材現成：`make demo` 的 NOT_APPROVED / STALE 兩顆鏡頭、`airport_fee` 由 DRIFT 轉 CURRENT）
+- repo 轉 public + About 區 Apache-2.0
+- Devpost 送件。**不要勾** Feedback Survey 獎（與其他獎互斥）
+
+這些不是卡點，是最後一哩。**不要再把它們列成待辦清單當進度回報。**
+
+⚠️ 凍結生效中。再動 `detectors.py` / `adapter.py` / `evidence.py` /
+`replay_tlc.py` / `mine_orphaned_docs.py` / `run_orphan_bench.py` 任一個，
+`freeze.py --check` 就紅，holdout 的 2/2 可信度跟著沒。要改就得跑第五輪：
+修 → 重凍結 → 換新來源單跑。前四輪流程都在 git 歷史裡，可重複。
+
+## 外部意見（都在 repo）
+
+- `docs/REVIEW-r1-{codex,duo}.md`、`docs/REVIEW-r2-{codex,duo}.md` — 兩輪四份審查
+- `docs/CONSULT-{fable,opus5}.md` — 對三個已拍板決定的第二意見。
+  Fable 推翻了「不修那兩類失敗」，並算出我沒算過的精確率 9.4%（96 筆警報 9 筆真）
+
+⚠️ **派 duo 的前置條件**（踩過五種死法）：工作目錄必須是 git repo 且有 `.claude/rules/`；
+websocket 1006 斷線會讓整回合工具通道失效，那是基礎設施問題不是任務問題，換目錄重派。
+
+## 踩過的坑
+
+1. **開工前沒列平台能力面** — 最貴的一個，花四輪重造 DataHub 已有的東西。已寫進 memory。
+2. **DataHub 有兩個描述欄位**，UI 顯示 `editableProperties`。欄位層同理，且 Kit 會丟掉。
+3. **不要把兩側都 lower() 再比對** — 會抹掉大小寫改名這個要抓的訊號。
+4. **set 迭代順序隨 PYTHONHASHSEED 變** — finding id 依位置編號，同一個 process 內測不出來，
+   回歸測試要跨子程序跑不同 seed。
+5. **只報 recall 不報 precision 等於宣稱了沒寫下來的東西。**
+6. **oracle 標錯東西比偵測器寫錯更難發現** — 標籤看起來合理、數字跑得出來，
+   但量的不是你要的。查法：抽幾筆正例，確認「被引用的 token 在漂移窗兩端是不是真的是該表欄位」。
 
 ## 相關路徑
 
@@ -114,8 +121,6 @@ Originality 危險的理由：`b2_datahub_native` 對照不存在、D5 停擺後
 |---|---|
 | 本專案 | `/Volumes/CyhSSD/Dev/hackathon/active/context-drift-sentinel` |
 | 賽事情報基地 | `/Volumes/CyhSSD/Hackathon/active/datahub/` |
-| BRIEF v2（含企業敘事層） | 同上 `BRIEF-v2.md` |
-| 三路 r2 盲跑 ROUTE | 同上 `runs/r2-{codex,claude,duo}-ROUTE.md` |
-| SPEC 定稿 | 同上 `SPEC-FINAL.md`（= 本專案 `docs/SPEC.md`） |
-| 現況事實檔 | 同上 `STATUS-v2.md` |
-| dbt_shopify clone | scratchpad，compact 後可能已清，需重 clone |
+| datahub fork（PR 用） | scratchpad `datahub-fix/`，sparse checkout |
+| skills fork | scratchpad `skills-fork/`，PR 分支 `feat/context-drift-skill` |
+| dbt 語料 clone | scratchpad `holdout-search/`，compact 後可能已清 |
