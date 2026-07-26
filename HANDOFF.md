@@ -23,6 +23,39 @@ DataHub 裡人寫的文件與 schema 現實脫節之處，證據取自 DataHub �
 換設計的原因寫在 memory 的 `survey-platform-surface-before-building`：
 我沒先把 DataHub 的能力面列完就開工，花四輪重造它已經publish的東西。
 
+## ⚠️ 2026-07-26 下半場：外部審查抓到的四件事
+
+派了 duo + codex + 兩個 agent。**每一輪都在我剛提交的東西裡抓到洞**，其中一條會毀資料。
+
+1. **讀截斷被當成「欄位不存在」（已修，會毀資料）**
+   `adapter.list_schema_fields` 預設 `limit=100`，Kit 還會在 token 預算處提前停。
+   我沒讀 `remainingCount`。實測 120 欄的表：`returned=100`，活著且有說明的 `col_105`
+   被判 `D1_ORPHANED_DOC`，接著移除路徑會刪掉它的說明、收據寫 VERIFIED。
+   **官方 showcase datapack 就會踩到**（`order_details` 55 欄只回 15）。
+   現在 scan／`_orphan_proposal`／executor 三處 fail closed，`_complete_field_set()` 在 `cli.py`。
+2. **改名分支不查帳本就判 DRIFT（已修）** — 近似名稱單獨就能斷言，正是重建要幹掉的東西，
+   靠「排在帳本檢查前面」活下來。現在必須帳本記載離開，近似名稱只用來指出後繼者。TLC 改前改後都 41/41。
+3. **我在生成的報告裡寫死沒量過的數字（已修）** — `| --mutate-skip-rewrite | 0/2 |` 是字面常數，
+   hubspot 有 4 個正例根本對不上。一份主張「數字是量出來的」的提交不能這樣。
+4. **`baselines.ours()` 沒傳 `vanished`（已修）** — 規則收緊後 StillTrue 在 README 叫評審跑的
+   那支腳本裡跟 B1 打平。接上帳本後重跑：B0 0/2、B1 1/2、B2 0/2、StillTrue 2/2。
+
+**教訓**：改判定規則要 grep 所有呼叫點。`baselines.py` 不在凍結清單，所以 `--check` 是綠的，
+但它呼叫的是被凍結的 `detect_schema_break`——凍結保護不了「呼叫方式」。
+
+## 孤兒描述現在可以修了
+
+`apply` 原本寫死 `aspect="dataset_description"`，所以最原創的 finding 只能列不能修。現在：
+後繼者存在且無說明 → 複製過去（**是複製不是搬移**，孤兒要第二次 apply 才清掉，CLI 會提示）；
+其餘 → 移除。移除是 Gate 唯一允許的刪除，且 executor 寫入前重讀 schema，欄位回來就 CONFLICT。
+
+⚠️ **移除走不了 Kit**：`update_description` 是 Kit 對這個 aspect 的唯一寫入，
+而 DataHub 對不在 schema 的欄位一律回 `BAD_REQUEST`——也就是這條路徑的每一個欄位。
+所以直接改寫 `EditableSchemaMetadataClass`。這是第四個平台發現：**Kit 對孤兒是看不到也清不掉**。
+
+⚠️ **孤兒的修復在 UI 上零變化**（它本來就沒被渲染）。所以那段的證據只能是 aspect 前後對照
+`['airport_fee'] → []`，不能靠截圖。錄影要演這段必須切 API 畫面。
+
 ## 兩個偵測器
 
 | | 抓什麼 | 證據來源 |
@@ -112,6 +145,20 @@ TLC 重播 2026-07-26 重跑過，涵蓋 TLC 已發布的全部 41 個月（2023
 - Devpost 送件。**不要勾** Feedback Survey 獎（與其他獎互斥）
 
 這些不是卡點，是最後一哩。**不要再把它們列成待辦清單當進度回報。**
+
+## 賽事要求對位（翻過原文，不是印象）
+
+BRIEF：「專案須為提交期間內新建，且**至少使用下列其一**：MCP Server / Agent Context Kit /
+DataHub Skills / Analytics Agent」。StillTrue 用 Agent Context Kit，五讀一寫實際 import：
+`get_entities`／`list_schema_fields`／`get_lineage`／`get_dataset_queries`／`grep_documents`
+＋ `descriptions.update_description`。
+
+評分「Use of DataHub」原文：「The strongest submissions go beyond reading metadata and
+**contribute back to the graph** where appropriate.」——寫回是明文加分項。
+
+⚠️ **講法要準**：DataHub 裡沒有 StillTrue 的面板。截圖那個 UI 是他們的 quickstart
+`localhost:9002`，我沒寫任何前端。進到他們裡面的是**產出**（描述內容、變更帳本），不是工具。
+說成「搭載在他們 UI 裡」會被拆。
 
 ⚠️ 凍結生效中，**九個檔案**（第五輪）：`detectors.py` / `adapter.py` / `evidence.py` /
 `replay_tlc.py` / `mine_orphaned_docs.py` / **`mine_drift_labels.py`** /
