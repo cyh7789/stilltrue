@@ -39,31 +39,26 @@ executor（寫前重讀／冪等／寫後回讀）、ledger（hash 鏈）、cli�
 - datahub-project/datahub **#18622** — 公開 `resolve_description()`，CI 全綠
 - datahub-project/datahub-skills **#49** — `datahub-context-drift` skill
 
-## 待辦（兩輪四份審查後定案，順序含硬約束）
+## 待辦
 
-⚠️ **硬約束：凍結必須在所有程式碼改動之後、新來源單跑之前。**
-所以執行時間軸是「D2 → 凍結 → 新 holdout 單跑 → 提交面」，與下面的效益排序相反。
+**已完成（2026-07-26）**：凍結 + 凍結後 holdout 單跑、Originality 證據、D2 結案。
 
-1. **提交消費面**（約 4 天，效益最大）
-   影片 2 天（分鏡照 SPEC §5，素材已現成：demo 的 NOT_APPROVED 與 STALE 兩顆鏡頭）；
-   README 定稿 1 天（含 L3 證據——URN 清單 + DataHub UI 截圖）；
-   repo 轉 public + About 區 Apache-2.0 + Devpost 0.5 天。
-   提交時**不要勾** Feedback Survey 獎——與其他獎互斥。
+1. ~~D2 新鮮度偵測~~ — **測定做不出來**，已結案（`docs/D2-FEASIBILITY.md`）。
+   76 張表 0 筆描述宣稱更新週期、`get_entities` 不回傳時間戳、assertion 全庫 0 筆、
+   `nyc-taxi` datapack 不在官方 registry。硬做等於自己寫題目自己改考卷。
+2. ~~凍結 + 新 holdout~~ — **已完成**。`dbt_fivetran_log` 13/32（41%），誤報 9.59%。
+   對照開發集的 90% / 4.50%：recall 腰斬、誤報翻倍。兩類失敗刻意不修。
+3. ~~Originality 證據~~ — **已完成**（`docs/NATIVE-COMPARISON.md`）。
 
-2. **凍結 + 一條凍結後的新第三方來源，單跑一次**（1.5–2 天）
-   `freeze.json` 釘住 detectors／分類定義／跑分腳本的 hash → 用現成的
-   `mine_drift_labels.py` 換一個沒碰過的同型 dbt 套件 → 只跑一次，難看照登。
-   兩份既有 benchmark 已證實塑造過規則，重跑它們量的仍是 fit，救不回 Grand 級第一件。
+**剩下唯一一件：提交消費面**（約 4 天，效益最大，也是最弱的一條）
+- 影片 2 天。素材現成：demo 的 NOT_APPROVED / STALE 兩顆鏡頭、`airport_fee` 由 DRIFT 轉 CURRENT
+- README 首屏已改成 holdout 41% 打頭；還缺 L3 可見證據（URN 清單 + DataHub UI 截圖）
+- repo 轉 public + About 區 Apache-2.0 檢查
+- Devpost 送件。**不要勾** Feedback Survey 獎——與其他獎互斥
 
-3. **D2 新鮮度偵測**（1.5–2 天）—— 兩路分歧，選 D2 不選 D5
-   duo 的三條理由：D5 的 8 小時停損幾乎必然觸發（`get_dataset_queries` total 為 0）；
-   D2 有官方 `nyc-taxi` datapack 自帶 planted freshness issues 當 ground truth；
-   **灌合成資料跑 D5 會在剛清完的誠信傷口上再開一刀**——Aman 的痛點就是 silent failure，
-   合成輸入正是另一種 silent failure。做完可講「三類實作＋兩類明文降級」。
-
-**刻意不做**：D5 接真 LLM、Review UI、程序級憑證分離（README 標界即可）、
-內部 holdout（第 2 項已覆蓋其目的）、修 dbt_shopify 那 4.5% 誤報
-（審查要的是量測不是修，且修完又變成「對著 benchmark 調」）。
+⚠️ **凍結已生效**。再動 `detectors.py` / `adapter.py` / `evidence.py` /
+`mine_drift_labels.py` / `run_shopify_bench.py` 任一個，`bench/freeze.py --check` 就會紅，
+holdout 那 41% 的可信度跟著沒了。要改就得重跑整條凍結流程換新來源。
 
 ## 四份審查（都在 repo 裡）
 
