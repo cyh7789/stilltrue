@@ -47,32 +47,39 @@ used as an acceptance check on a code change.
 
 **2. `0757ee3` — the dbt_shopify score set a branch condition.**
 
-The comment sitting in `detectors.py` today, added by that commit, states the
-dependency in the source itself:
+That commit added a branch whose own comment stated the dependency: a table
+description is prose and cites other tables, entity types and placeholders,
+where a field description rarely does — *measured on fivetran/dbt_shopify: 9 of
+10 identifier-change positives live here*. The rule that produced the 9/10 was
+chosen because of the 9/10.
 
-```python
-# A table description is prose and cites other tables, entity types and
-# placeholders; a field description rarely does. Measured on
-# fivetran/dbt_shopify: 9 of 10 identifier-change positives live here.
-verdict, confidence = "DRIFT", "medium"
-```
-
-The rule that produces the 9/10 was chosen because of the 9/10.
+That code no longer exists. `ce3f819` replaced the detector wholesale with the
+change-log design, and neither the branch nor its comment survived — `grep -rn
+"identifier-change positives" src/` returns nothing today. The commit remains
+the record of what happened, which is why it stays on this page; quoting it in
+the present tense was wrong and is corrected here.
 
 ## What this means for each number
 
-(The table below covers the two development benchmarks. The frozen holdout added
-afterwards is a separate thing and is described at the end of this page.)
+**This section described rounds 1–2 and their numbers are all withdrawn.** The
+detector they were measured on no longer exists, and the oracle that produced
+the dbt_shopify labels turned out to measure documentation-editing behaviour
+rather than what this system decides. The current numbers, and what each is
+worth, live in the README's Evidence section and in `bench/REPLAY-REPORT.md`.
 
-| Source | Still true | No longer claimable |
-|---|---|---|
-| NYC TLC — 2/2, 0 FP | labels are the diff of two published TLC parquet schemas; anyone can regenerate them without running this project | that the system never saw the result before being finalised |
-| dbt_shopify — 9/10 identifier changes | labels are the upstream maintainers' own documentation-fix commits, mined by a script written before the detector | that it is an untouched holdout scored once |
-| `showcase-ecommerce` — 0 false positives on 25 tables | measured on the official datapack | never claimed as a holdout |
+Kept here because the shape of the mistake is the point:
 
-Both sources are **third-party benchmarks used during development**. That is a
-weaker and more common form of evidence than a frozen holdout, and it is what we
-have. Wherever this repo previously said "holdout", it now says "benchmark".
+| Withdrawn | Why |
+|---|---|
+| NYC TLC — 2/2, 0 FP | superseded by the 41-month replay; and "2/2 events" was itself wrong — one of the two events was never scored, see `bench/REPLAY-REPORT.md` |
+| dbt_shopify — 9/10 identifier changes | the oracle labelled "descriptions later edited"; in 9 of its 10 positives the referenced token was never a column of that model at either end of the window |
+| `showcase-ecommerce` — 0 false positives on 25 tables | still measured, still true, never claimed as a holdout |
+
+Every source in this repo is a **third-party benchmark used during
+development**. Round 4 added a frozen holdout and round 5 spent its blindness by
+rescoring it through a harness written after the result was known — stated in
+the README rather than left to be discovered. Wherever this repo once said
+"holdout", it now says what the number actually is.
 
 ## Why the numbers are still worth reading
 
@@ -136,3 +143,38 @@ the wrong reason. The honest development figure was always nearer 7/10.
 It exited 1 when the round-1 fix landed, which is how round 2 began.
 Full results: [`bench/HOLDOUT-REPORT.md`](../bench/HOLDOUT-REPORT.md) and
 [`HOLDOUT-REPORT-v1.md`](../bench/HOLDOUT-REPORT-v1.md).
+
+## Rounds 3–6, and why the numbers above are gone
+
+**Round 3 threw the detector away.** Rounds 1–2 measured a detector that pulled
+field-looking tokens out of prose and guessed at renames by string similarity.
+Across three corpora it made 120 assertions and got 17 right. `ce3f819` replaced
+it with the change-log design; every figure above belongs to code that no longer
+exists.
+
+**Round 4 replaced the oracle too**, which is the more uncomfortable half. The
+old labels marked "descriptions that were later edited" — documentation-editing
+behaviour, not what this system decides. Checking dbt_shopify's ten
+identifier-change positives against the model's own columns found nine whose
+referenced token was never a column of that model at either end of the window.
+The detector "caught" them by firing on prose, and a label-based oracle credits
+that as a hit. An oracle measuring the wrong thing is harder to notice than a
+broken detector, because the labels look reasonable and the numbers come out.
+
+**Round 5 tightened the rule and widened the freeze.** A lookalike column no
+longer asserts a rename by itself; the change log has to record the departure.
+`mine_drift_labels.py` and `select_holdout.py` joined the hashes — the first
+because two frozen files imported it from outside the freeze, the second because
+it decides which source gets graded.
+
+**Round 6 was one file, for one sentence.** The report generator printed a
+mutation score it had never measured. No score moved; eight of nine hashes were
+byte-identical.
+
+**What the current numbers are worth** is in the README's Evidence section, not
+here. The short version: the 41-month TLC replay runs end to end through
+DataHub; the orphaned-doc numbers were re-scored the same way after the original
+harness turned out to be tautological; and `dbt_iterable`'s blindness is spent,
+because the harness that scores it now was written after its result was known.
+What carries those numbers is a mutation that makes the benchmark fail on
+demand, not the order things were run in.

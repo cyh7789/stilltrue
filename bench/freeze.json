@@ -1,9 +1,9 @@
 {
-  "frozen_at": "2026-07-26T11:36:29+00:00",
-  "git_commit": "ce8d83512891c85fed1a776cb2aa31520d15bbea",
+  "frozen_at": "2026-07-26T11:52:22+00:00",
+  "git_commit": "d3e6ccb894879e17174effcb80853d6267cdc7a9",
   "files": {
     "src/stilltrue/detectors.py": "759e33fe9e380ea8d5c6a89b3992c61e5d8aaed66dade5e76b430e2b04bdc761",
-    "src/stilltrue/adapter.py": "69bc329d4285de93dcbab3177635a18bc5551ec6685011788ed4a1ca92ac4dd6",
+    "src/stilltrue/adapter.py": "378a05e778c365d3026719ef82e138416f53c3748b0388489256e952b52ba5f9",
     "src/stilltrue/evidence.py": "b9c6e08597a95b9adf572fbd527a6be199341552ae156b24863c34d71f692d94",
     "bench/oracles/replay_tlc.py": "6a4f8dcd0b8a791eed0633c1011c1527db12c9579185cfa1b78d8220a9135b45",
     "bench/oracles/mine_orphaned_docs.py": "993d6da763d0379556f5b0173196d40037926779c7b5336991039fcb596f167f",
@@ -33,10 +33,11 @@
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
-    "round": 6,
+    "round": 7,
     "history": "Rounds 1-3 graded detectors and oracles that have since been replaced. The old oracle labelled 'descriptions that were later edited', which measures doc-editing behaviour rather than what this system decides -- in 9 of dbt_shopify's 10 identifier-change positives the referenced token was never a column of that model at either end of the window. The current oracle labels a column that left the model's SQL whose description outlived it, which git records without anyone judging intent. Sources touched under any earlier round are excluded above.",
     "round_5_scope": "Round 5 widened coverage and fixed a rule; it does not re-bless anything. Two changes to what is frozen: mine_drift_labels.py is now included, because both the round-4 miner and scorer imported it while it sat outside the hashes, and select_holdout.py is included, because it decides which source gets graded. Two additions reflect the scoring move to run_orphan_bench_datahub.py, which replays into DataHub and reads back through the adapter -- the round-4 scorer handed the detector the labelled column, the labelled description and the after-schema, which is its own decision rule restated, and could not have returned anything else. detectors.py changed too: a lookalike column in the current schema no longer asserts a rename on its own, because resemblance is not evidence the token was ever a field here; the change log has to record the departure first. The TLC replay is 41/41 before and after that change. NOTHING here restores blindness: dbt_iterable was a blind holdout for the round-4 harness, and the harness that scores it now was written after its result was known. What supports the current numbers is the mutation (--mutate-skip-rewrite scores 0/2), not the order of operations.",
-    "round_6_scope": "One graded file changed: run_orphan_bench_datahub.py. Its report generator emitted two literals it had never measured -- a '0/2' mutation row and the sentence 'the old harness returns the same 2/2'. The first is impossible on a corpus with four positives, and the second describes an argument the old harness silently ignores, since it has no such flag. A submission whose case is that its numbers are measured cannot ship a constant inside a generated report. Each report now states only the run that produced it. Scores are unchanged, because the change is to what gets written down, not to what gets counted; the other eight hashes are byte-identical."
+    "round_6_scope": "One graded file changed: run_orphan_bench_datahub.py. Its report generator emitted two literals it had never measured -- a '0/2' mutation row and the sentence 'the old harness returns the same 2/2'. The first is impossible on a corpus with four positives, and the second describes an argument the old harness silently ignores, since it has no such flag. A submission whose case is that its numbers are measured cannot ship a constant inside a generated report. Each report now states only the run that produced it. Scores are unchanged, because the change is to what gets written down, not to what gets counted; the other eight hashes are byte-identical.",
+    "round_7_scope": "A docstring, and nothing else. adapter.py's header said writes go through executor.py 'under a separate credential'; cli.py builds both against one connection, so that was false, and a reader who opened the source would have found it after the README had already been corrected. No statement executes: `git diff` on this round touches only the module docstring, the 67 tests are unchanged, and no benchmark was rerun because none could move. Recorded as a round of its own rather than folded into another, so the hash change has a reason attached to it."
   },
   "note": "The NYC TLC replay is a development benchmark and is NOT covered by this freeze -- that data shaped this detector. See docs/VALIDATION-INTEGRITY.md."
 }

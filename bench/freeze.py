@@ -63,7 +63,7 @@ SELECTION_RULE = {
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
-    "round": 6,
+    "round": 7,
     "history": (
         "Rounds 1-3 graded detectors and oracles that have since been replaced. The old "
         "oracle labelled 'descriptions that were later edited', which measures doc-editing "
@@ -101,6 +101,16 @@ SELECTION_RULE = {
         "report. Each report now states only the run that produced it. Scores are "
         "unchanged, because the change is to what gets written down, not to what gets "
         "counted; the other eight hashes are byte-identical."
+    ),
+    "round_7_scope": (
+        "A docstring, and nothing else. adapter.py's header said writes go through "
+        "executor.py 'under a separate credential'; cli.py builds both against one "
+        "connection, so that was false, and a reader who opened the source would have "
+        "found it after the README had already been corrected. No statement executes: "
+        "`git diff` on this round touches only the module docstring, the 67 tests are "
+        "unchanged, and no benchmark was rerun because none could move. Recorded as a "
+        "round of its own rather than folded into another, so the hash change has a "
+        "reason attached to it."
     ),
 }
 

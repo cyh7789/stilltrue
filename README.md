@@ -182,20 +182,22 @@ is a different claim from `2 findings`.
 That decision is what makes the numbers hold up. Real descriptions are prose:
 they cite other tables, DataHub entity types, placeholders like `table_name`.
 Reporting every unresolved token as drift produced 6 false drift verdicts across
-25 tables from the `showcase-ecommerce` datapack. Requiring a rename candidate
-before calling anything drift takes that to **zero**, while both NYC TLC
-ground-truth events are still caught:
+25 tables from the `showcase-ecommerce` datapack. Requiring DataHub's change log
+to record the departure before calling anything drift takes that to **zero**:
 
 ```
 $ stilltrue scan --urn "urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)"
-  2 drift, 5 verified current, 0 abstained (7 checks)
+  3 drift, 5 verified current, 0 abstained (8 checks)
 
   D1_SCHEMA_BREAK  airport_fee -> likely renamed to `Airport_fee`
   D1_UNDOCUMENTED  cbd_congestion_fee exists in the schema but has no description
+  D1_ORPHANED_DOC  airport_fee: documentation attached to a field that is gone
 ```
 
-The cost is stated plainly: a column that was genuinely deleted, with no
-similarly named replacement, now reads as abstention rather than drift.
+The cost is stated plainly: a column whose departure DataHub never recorded now
+reads as abstention rather than drift, however much a current column resembles
+it. That resemblance used to be enough on its own, which meant a token that was
+never a field here could be reported as a rename.
 
 ## Evidence
 

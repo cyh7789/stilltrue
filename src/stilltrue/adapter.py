@@ -3,8 +3,14 @@
 Security constraint (SPEC 1.2 item 2): this module wraps **only** the read
 tools of the Agent Context Kit. The mutation tools (add_tags,
 add_glossary_terms, descriptions, documents, add_owners) are deliberately
-absent and never imported here. Writes go through executor.py under a
-separate credential.
+absent and never imported here, so nothing on the detector path can reach a
+write. Writes go through executor.py.
+
+That separation is structural, not privileged: cli.py builds this adapter and
+the executor against the same DataHub connection. The executor takes a `token`
+argument so a deployment can give it a different identity, but nothing in this
+repo passes one -- and this docstring claimed a separate credential, which was
+not true.
 
 Every call registers its result as Evidence, so any later claim can point back
 to which function read which URN, when, and what it returned.

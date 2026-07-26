@@ -10,10 +10,10 @@ Every file here is the unedited output of `make demo`, not written by hand.
 
 ```
 $ stilltrue scan --urn "urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)"
-  2 drift, 5 verified current, 0 abstained (7 checks)
+  3 drift, 5 verified current, 0 abstained (8 checks)
 ```
 
-Five of the seven identifiers the description names still resolve, so they are
+Five of the six identifiers the description names still resolve, so they are
 recorded as `CURRENT`. That number is what makes the other two readable: this is
 a report that says how much it checked, not one that only speaks up about
 problems.
@@ -92,15 +92,21 @@ the content matched. A successful API response alone does not earn that status.
 
 ```
 $ stilltrue scan --urn "…nyc_tlc.yellow_tripdata…"
-  1 drift, 6 verified current, 0 abstained (7 checks)
+  2 drift, 6 verified current, 0 abstained (8 checks)
 
   D1_UNDOCUMENTED  cbd_congestion_fee exists in the schema but has no description
+  D1_ORPHANED_DOC  airport_fee: documentation attached to a field that is gone
 ```
 
 `airport_fee` moved from the drift column into the current column — the same
-reference, re-checked against a description that now matches the schema. The
-remaining finding is the second real TLC event: the column added in January 2025
-that nobody documented.
+reference, re-checked against a description that now matches the schema.
+
+Two findings remain, and both should. One is the second real TLC event: the
+column added in January 2025 that nobody documented. The other is a separate
+fault from the same rename — a column description written while `airport_fee`
+existed, still sitting in `editableSchemaMetadata` and rendered nowhere. Fixing
+the prose does not touch it. `make demo` continues into that one (steps 6 and 7);
+the scan afterwards returns 1 drift on 7 checks.
 
 ## 5. The trail is verifiable, including the refusals
 
