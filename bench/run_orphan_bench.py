@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT.parent / "src"))
 
 from oracles.mine_drift_labels import sql_columns_at  # noqa: E402
 
-from stilltrue.detectors import VanishedField, detect_schema_break  # noqa: E402
+from stilltrue.detectors import detect_orphaned_docs  # noqa: E402
 
 
 def main() -> None:
@@ -47,31 +47,24 @@ def main() -> None:
             cache[key] = frozenset(sql_columns_at(repo, commit, model) or ())
         return cache[key]
 
-    def asserts_drift(model: str, column: str, description: str,
-                      schema: frozenset, vanished: dict) -> bool:
-        # The dataset as DataHub would hold it: the surviving columns, with the
-        # orphaned description still attached to the column it describes.
-        fields = [{"fieldPath": c, "description": "", "nativeDataType": "unknown"}
-                  for c in sorted(schema)]
-        fields.append({"fieldPath": column, "description": description,
-                       "nativeDataType": "unknown"})
+    def asserts_drift(model: str, column: str, description: str, schema: frozenset) -> bool:
+        """The dataset as DataHub holds it after the column left.
+
+        The schema is what the SQL produces now; the description is still keyed
+        to the departed column in the editable aspect, exactly as DataHub keeps
+        it when a pipeline rewrites schemaMetadata and leaves
+        editableSchemaMetadata alone.
+        """
         urn = f"urn:li:dataset:(urn:li:dataPlatform:dbt,{repo.name}.{model},PROD)"
-        found = detect_schema_break(urn, "", fields, ["ev_bench"], vanished=vanished)
-        return any(f.category == "D1_SCHEMA_BREAK" and f.verdict == "DRIFT" for f in found)
+        found = detect_orphaned_docs(urn, {column: description}, set(schema), ["ev_bench"])
+        return any(f.verdict == "DRIFT" for f in found)
 
     caught, missed = [], []
     for r in [x for x in rows if x["label"] == "orphaned"]:
-        before = columns_at(r["c1"], r["model"])
         after = columns_at(r["c2"], r["model"])
-        if not before or not after:
+        if not after:
             continue
-        gone = {
-            name: VanishedField(name=name, operation="REMOVE", observed_at=0,
-                                semantic_version="(git)",
-                                datahub_says=f"column left the SQL at {r['c2'][:12]}")
-            for name in before - after
-        }
-        (caught if asserts_drift(r["model"], r["column"], r["description"], after, gone)
+        (caught if asserts_drift(r["model"], r["column"], r["description"], after)
          else missed).append(r)
 
     quiet, false_alarms = [], []
@@ -79,8 +72,8 @@ def main() -> None:
         schema = columns_at(r["commit"], r["model"])
         if not schema:
             continue
-        # Nothing left this model at this commit, so there is nothing to assert.
-        (false_alarms if asserts_drift(r["model"], r["column"], r["description"], schema, {})
+        # The column is in the schema at this commit, so its documentation is current.
+        (false_alarms if asserts_drift(r["model"], r["column"], r["description"], schema)
          else quiet).append(r)
 
     pos, neg = len(caught) + len(missed), len(quiet) + len(false_alarms)
