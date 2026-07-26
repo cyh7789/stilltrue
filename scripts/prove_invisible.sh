@@ -9,8 +9,18 @@ set -euo pipefail
 
 SERVER="${1:-http://localhost:8080}"
 URN='urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)'
-OUT=docs/evidence
 PY=.venv/bin/python
+
+# Writes to runs/ by default. This script re-captures both frames, so pointing it
+# at docs/evidence would overwrite the committed pair it exists to explain -- and
+# a rerun during filming would silently replace the images the documents cite.
+# `--publish` is how they get regenerated on purpose.
+OUT=runs/invisible
+if [ "${2:-}" = "--publish" ] || [ "${1:-}" = "--publish" ]; then
+  OUT=docs/evidence
+fi
+mkdir -p "$OUT"
+echo "frames -> $OUT"
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 

@@ -32,8 +32,8 @@ first draft claimed only two did, and was wrong about which.
 | 7 | 1:24–1:56 | Split: left `curl …?aspect=editableSchemaMetadata` returning the note; right `05-orphan-present.png`. Then `bash scripts/prove_invisible.sh` output. Cut to the 110-pixel line. | "The third finding is one no DataHub page will show you. Document a column while `airport_fee` exists; the pipeline replaces the schema, and the note stays, keyed to a column that is gone. The aspect API returns it. The page renders nothing — descriptions merge onto current fields, and there is no row left to merge onto. So fixing it changes nothing on screen: a hundred and ten pixels out of one point three million, and every one of them is a clock." (82w) |
 | 8 | 1:56–2:18 | `bench/REPLAY-REPORT.md` result table, then `bench/tlc-replay-results.jsonl` scrolling. | "Forty-one months of real published taxi schemas, ingested in order. The same description is re-ingested every month and never corrected, so the right answer is to report the break in the month it happens and every month after. Forty-one consecutive decisions, all correct, no false alarms — one quiet month, one onset, thirty-nine holds." (55w) |
 | 9 | 2:18–2:32 | Terminal: `--mutate-skip-rewrite` run showing 0/2 beside the normal 2/2. `bench/HOLDOUT-orphan-iterable-datahub.md`. | "The orphan benchmark ships with a switch that breaks it on purpose. Remove the schema rewrite and it scores zero. A benchmark that cannot fail is not evidence." (27w) |
-| 10 | 2:32–2:44 | Four GitHub PR pages, tiled. | "Four patches went upstream. One is the Agent Context Kit fetching field descriptions and deleting them before the merge its docstring promises — found by needing it to work." (29w) |
-| 11 | 2:44–2:50 | Title card: name, repo URL, Apache-2.0. | "StillTrue. Every number here regenerates from the repo." (8w) |
+| 10 | 2:32–2:44 | `docs/evidence/prs/pr-{18622,18628,18630,49}.png`, tiled. `pr-18628.png` shows the Open pill, 38 checks and the bug write-up in one frame. | "Four patches went upstream. One is the Agent Context Kit fetching field descriptions and deleting them before the merge its docstring promises — found by needing it to work." (29w) |
+| 11 | 2:44–2:50 | `docs/evidence/07-title-card.png`. | "StillTrue. Every number here regenerates from the repo." (8w) |
 
 ---
 
@@ -44,29 +44,30 @@ in shot 5 must be the one from shot 4's scan. Reloading the benchmark between
 takes changes every hash and the timeline version, and a judge comparing the two
 frames would see one write with two different hashes.
 
-⚑ **Shot 7** — `prove_invisible.sh` is **not** a read-only comparison of two
-committed images. It rebuilds the benchmark, writes to DataHub, captures, removes
-the orphan, captures again — and **overwrites `docs/evidence/05-orphan-present.png`
-and `06-orphan-removed.png` in the process** (`scripts/prove_invisible.sh:17-42`).
-So it is a live shot like 4–5, and if the committed stills are wanted unchanged,
-copy them aside before rolling.
+⚑ **Shot 7** — `prove_invisible.sh` is a live run, not a comparison of two
+committed images: it rebuilds the benchmark, writes to DataHub, captures, removes
+the orphan and captures again. It now writes to `runs/invisible/` by default, so
+filming it cannot overwrite the committed pair the documents cite; regenerating
+those is `--publish`, deliberately.
 
-⚑ **Shot 9** — the mutation needs the full command, both ways, against a running
-DataHub with a `dbt_iterable` clone that does not currently exist on this machine:
+⚑ **Shot 9** — both directions, against a running DataHub and a clone:
 
 ```bash
-python3 bench/run_orphan_bench_datahub.py <clone> bench/oracles/orphaned-dbt-iterable.jsonl
-python3 bench/run_orphan_bench_datahub.py <clone> bench/oracles/orphaned-dbt-iterable.jsonl --mutate-skip-rewrite
+git clone --quiet https://github.com/fivetran/dbt_iterable /tmp/dbt_iterable
+python3 bench/run_orphan_bench_datahub.py /tmp/dbt_iterable bench/oracles/orphaned-dbt-iterable.jsonl
+python3 bench/run_orphan_bench_datahub.py /tmp/dbt_iterable bench/oracles/orphaned-dbt-iterable.jsonl --mutate-skip-rewrite
 ```
 
-Falling back to the committed table in `bench/HOLDOUT-orphan-iterable-datahub.md`
-is acceptable and loses only the live-terminal feel.
+Each pass replays ~50 cases through DataHub, so allow several minutes per run —
+this is not a shot you can improvise on the day. The committed table in
+`bench/HOLDOUT-orphan-iterable-datahub.md` is the fallback and loses only the
+live-terminal feel.
 
-⚑ **Shot 10** — four GitHub PR pages, captured in a browser. Not in the repo.
+**Shot 10** — `python3 scripts/capture_prs.py` writes the four PR pages to
+`docs/evidence/prs/`. Committed; no browser needed on the day.
 
-**Shot 11** has no source file. Either produce a title card and name it here, or
-say plainly that it is a post-production card; leaving it unnamed breaks this
-document's own rule.
+**Shot 11** — `python3 scripts/capture_card.py` renders `scripts/title_card.html`
+to `docs/evidence/07-title-card.png` at 1920×1080. Edit the HTML, not the PNG.
 
 Everything else is a committed file.
 
