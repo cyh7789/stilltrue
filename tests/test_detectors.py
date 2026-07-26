@@ -172,3 +172,61 @@ def test_finding_order_is_stable_across_processes():
         orders.add(out.stdout.strip())
 
     assert len(orders) == 1, f"ordering varied by hash seed: {orders}"
+
+
+# --- Prose that names something other than a column of this table -----------
+# Every string below is verbatim from fivetran/dbt_shopify or
+# fivetran/dbt_fivetran_log, and every one produced a false DRIFT verdict.
+# The shared shape: the sentence itself says the token is not a field here.
+
+def _fields(*names):
+    return [{"fieldPath": n, "description": "", "nativeDataType": "unknown"} for n in names]
+
+
+def _verdicts(desc, *schema, subject=None):
+    fields = _fields(*schema)
+    fields[0] = {**fields[0], "description": desc}
+    found = detect_schema_break(DBT_URN, "", fields, ["ev"])
+    return [f.verdict for f in found
+            if f.category == "D1_SCHEMA_BREAK" and (subject is None or f.subject == subject)]
+
+
+def test_enumerated_values_are_not_field_references():
+    """dbt_fivetran_log: one description listed five statuses and produced five false positives."""
+    desc = ("Current sync and connection status of the connection. Possible values include "
+            "`broken`, `deleted`, `incomplete`, `connected`, `paused`")
+    assert "DRIFT" not in _verdicts(desc, "connection_health", "connection_id")
+
+
+def test_such_as_enumeration_is_not_a_field_reference():
+    """dbt_shopify: `in_transit`, `label_printed` and friends are shipment states, not columns."""
+    desc = 'The status, such as `in_transit`, `label_printed`, or `out_for_delivery`.'
+    assert "DRIFT" not in _verdicts(desc, "status", "shipment_id")
+
+
+def test_foreign_key_prose_names_a_table_not_a_column():
+    """dbt_fivetran_log: correct documentation of a relationship, read as a broken reference."""
+    desc = "Foreign key referencing the ID of the `account` that the user belongs to."
+    assert "DRIFT" not in _verdicts(desc, "account_id", "user_id")
+
+
+def test_a_noun_qualified_identifier_is_not_a_field():
+    """`insert_overwrite` is qualified as a method; the existing rule only knew about schemas and tables."""
+    desc = "Used for partitioning with the `insert_overwrite` incremental method."
+    assert "DRIFT" not in _verdicts(desc, "partition_key", "row_id", subject="insert_overwrite")
+
+
+def test_a_dotted_reference_points_at_another_entity():
+    """`incremental_mar.schema_name` is another model's column, not two missing ones here."""
+    desc = "Name of the connection. This may differ from `incremental_mar.schema_name`."
+    assert "DRIFT" not in _verdicts(desc, "connection_name", "connection_id")
+
+
+def test_a_rename_candidate_still_wins_over_all_of_this():
+    """The guard rail: these rules must never swallow the event the project exists to catch.
+
+    A near-match in the schema is the strongest signal available, so it outranks
+    any prose context -- even prose that looks like an enumeration.
+    """
+    desc = "Possible values include `airport_fee` and others."
+    assert _verdicts(desc, "Airport_fee", "fare_amount", subject="airport_fee") == ["DRIFT"]

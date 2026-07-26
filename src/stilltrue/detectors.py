@@ -66,14 +66,66 @@ def referenced_identifiers(text: str) -> set[str]:
     return backticked | bare_snake
 
 
-# When an identifier is immediately followed by one of these, the author has
-NON_FIELD_QUALIFIERS = ("schema", "table", "database", "dataset", "model", "view", "catalog", "warehouse")
+# When an identifier is followed by one of these, the author has named the kind
+# of thing it is, and it is not a column of this table.
+NON_FIELD_QUALIFIERS = (
+    "schema", "table", "database", "dataset", "model", "view", "catalog", "warehouse",
+    "method", "strategy", "mode", "package", "macro", "grain",
+)
+
+# Phrases that introduce a list of the values a column can hold. What follows is
+# data, not schema -- and an enumerated value is spelled exactly like a column.
+ENUMERATION_MARKERS = (
+    "possible values", "valid values", "values include", "such as",
+    "one of", "either", "can be", "e.g.", "for example",
+)
+
+# Phrases that introduce a relationship. What follows names the *other* entity,
+# which is correct documentation, not a broken field reference.
+RELATION_MARKERS = ("foreign key", "referencing", "references the", "belongs to", "points to")
 
 
 def qualified_as_non_field(text: str, identifier: str) -> bool:
-    """Did the text itself say this is not a field, as in "`order_entry` schema"?"""
-    pattern = rf"`?{re.escape(identifier)}`?\s+({'|'.join(NON_FIELD_QUALIFIERS)})\b"
+    """Did the text itself say this is not a field, as in "`order_entry` schema"?
+
+    Up to two words may sit between: "`insert_overwrite` incremental method"
+    names a method just as plainly as "`x` table" names a table.
+    """
+    pattern = rf"`?{re.escape(identifier)}`?\s+(?:\w+\s+){{0,2}}({'|'.join(NON_FIELD_QUALIFIERS)})\b"
     return re.search(pattern, text, flags=re.I) is not None
+
+
+def names_something_else(text: str, identifier: str) -> bool:
+    """Does the surrounding prose say this token is not a column of this table?
+
+    Four shapes, all measured on real descriptions rather than imagined:
+
+      "Possible values include `broken`, `deleted`"      -> values
+      "the discount applies to all items (`all`)"        -> a value in apposition
+      "Foreign key referencing the ID of the `account`"  -> another entity
+      "may differ from `incremental_mar.schema_name`"    -> another entity's column
+
+    An enumeration's scope runs to the end of the description rather than to the
+    end of its sentence. Written docs list values as bullets and sub-sentences --
+    "Valid values include: - `label_printed`: A label was purchased. -
+    `in_transit`: ..." -- so a per-sentence window loses the marker on every
+    item after the first, which is most of them.
+
+    Callers apply this only where the verdict would otherwise be an assertion
+    made without a rename candidate. A near-match in the schema is stronger
+    evidence than any prose and keeps its DRIFT verdict.
+    """
+    ref = re.escape(identifier)
+
+    if re.search(rf"\w\.{ref}\b|\b{ref}\.\w", text):
+        return True        # part of a dotted path: a qualified reference elsewhere
+
+    if re.search(rf"\(\s*`?{ref}`?\s*\)", text):
+        return True        # parenthesised: an example or a value in apposition
+
+    m = re.search(rf"`?{ref}`?", text)
+    head = text[: m.start()].lower() if m else ""
+    return any(marker in head for marker in ENUMERATION_MARKERS + RELATION_MARKERS)
 
 
 def self_reference_tokens(entity_urn: str) -> set[str]:
@@ -158,7 +210,7 @@ def detect_schema_break(
                 # A case/underscore variant exists: strong signal (TLC case)
                 verdict, confidence = "DRIFT", "high"
                 reality = f"the schema has no `{ref}`, but it does have `{candidate}`"
-            elif where != "dataset description":
+            elif where != "dataset description" and not names_something_else(text, ref):
                 # The reference came from a *field* description. That context is
                 # narrow: when a column's own documentation names another
                 # snake_case identifier, it is almost always a sibling column
@@ -167,6 +219,11 @@ def detect_schema_break(
                 # tables, entity types and placeholders; a field description
                 # rarely does. Measured on fivetran/dbt_shopify: 9 of 10
                 # identifier-change positives live here.
+                #
+                # Unless the sentence says otherwise. Field descriptions also
+                # enumerate values and document relationships, and both spell
+                # things exactly like column names -- the single largest source
+                # of false positives on both benchmarks.
                 verdict, confidence = "DRIFT", "medium"
                 reality = f"the schema has no `{ref}` (it has {len(actual)} fields)"
             else:
