@@ -64,16 +64,19 @@ TLC 重播 2026-07-26 重跑過，涵蓋 TLC 已發布的全部 41 個月（2023
 | **#18622** | datahub | dataset 層描述解析（`resolve_description()`） |
 | **#18628** | datahub | 欄位層 editable 描述——Kit 抓了資料、刪掉、從沒合併。docstring 承諾的行為不存在 |
 | **#18630** | datahub | `list_schema_fields` 對沒有 schema 的 dataset 直接炸（`.get(k, {})` 遇到顯式 null）|
-| **#49** | datahub-skills | skill 改成變更帳本做法，含兩個踩過的坑 |
+| **#49** | **datahub-project**/datahub-skills | skill 改成變更帳本做法，含兩個踩過的坑 |
 
 #18630 是全機掃描時真的踩到的：`healthcare.main.patient_analytics` 掃不了。
 兩段式提交（測試紅 → 修綠），395 測試過。
 
 #18628 的 `python-lint` 曾紅過一次——我加的測試裡兩個 dict literal 超過 88 欄，
-`ruff format --check` 擋下來。已用 CI 釘的 `ruff==0.15.22` 重排推上去。
-**教訓：改上游前先裝它釘的 lint 版本跑一次，本地新版 ruff 的規則集不一樣。**
+`ruff format --check` 擋下來。已用 CI 釘的 `ruff==0.15.22` 重排推上去，
+現在四支 CI 都零失敗（`build-datahub-agent-context` 那個是 lint 掛掉的連帶）。
+**教訓：改上游前先裝它 `setup.py` 釘的 lint 版本跑一次，本地新版 ruff 的規則集不一樣。**
 
-維護者尚未審任何一支。
+⚠️ skills repo 是 `datahub-project/datahub-skills`，不是 acryldata——`gh` 查錯 org 會說 PR 不存在。
+
+四支都 mergeable、`REVIEW_REQUIRED`，維護者尚未審。
 
 ## 平台上的三個發現（提交敘事可用）
 
