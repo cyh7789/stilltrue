@@ -1,12 +1,12 @@
 {
-  "selected": "dbt_hubspot",
-  "url": "https://github.com/fivetran/dbt_hubspot",
+  "selected": "dbt_iterable",
+  "url": "https://github.com/fivetran/dbt_iterable",
   "licence": "Apache-2.0",
-  "commits": 643,
-  "months": 72,
-  "descriptions": 1633,
-  "positives": 48,
-  "negatives": 938,
-  "labels_file": "drift-labels-dbt-hubspot.jsonl",
-  "frozen_rule_commit": "954415d990e2b58871eca83ed8676bd7ddfb3e3e"
+  "commits": 375,
+  "months": 63,
+  "descriptions": 849,
+  "positives": 38,
+  "negatives": 393,
+  "labels_file": "drift-labels-dbt-iterable.jsonl",
+  "frozen_rule_commit": "ca13e88b258b4a04279b908653270caa29c6650a"
 }
