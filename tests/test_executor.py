@@ -127,3 +127,29 @@ def test_a_removal_proceeds_once_the_field_is_really_gone():
                        dry_run=True)
 
     assert ex.execute(p, p.proposal_hash).status == "VERIFIED"
+
+
+def test_a_removal_refuses_when_the_schema_could_not_be_read_in_full():
+    """A short read is not an empty schema.
+
+    list_schema_fields pages, and stops early on a token budget as well as a
+    limit. A field left out of a partial page is indistinguishable from one the
+    schema does not have -- which is exactly the question this guard asks.
+    Measured on a 120-column dataset: 100 returned, 20 remaining, and a live
+    documented column read as an orphan.
+    """
+    p = _removal()
+    ex = WriteExecutor(reader=lambda _: p.before_value, server="http://x",
+                       schema_reader=lambda _: None)
+    receipt = ex.execute(p, p.proposal_hash)
+
+    assert receipt.status == "CONFLICT"
+    assert "in full" in receipt.detail
+
+
+def test_a_removal_without_a_schema_reader_fails_rather_than_writing():
+    """The gate's exemption is justified by this check, so it must happen."""
+    p = _removal()
+    ex = WriteExecutor(reader=lambda _: p.before_value, server="http://x")
+
+    assert ex.execute(p, p.proposal_hash).status == "FAILED"

@@ -79,7 +79,7 @@ class WriteExecutor:
         server: str = "http://localhost:8080",
         token: str | None = None,
         dry_run: bool = False,
-        schema_reader: Callable[[Proposal], set[str]] | None = None,
+        schema_reader: Callable[[Proposal], set[str] | None] | None = None,
     ) -> None:
         self.reader = reader
         self.server = server
@@ -114,7 +114,22 @@ class WriteExecutor:
             # rollback, or the pipeline that dropped it running again. Then the
             # description is not orphaned any more, and removing it would delete
             # a live field's documentation.
-            live = self.schema_reader(p) if self.schema_reader else set()
+            #
+            # Both other answers fail closed. No reader at all means the check
+            # the gate's exemption is justified by never happened; None means the
+            # reader looked and could not see the whole schema, and a field
+            # missing from a short read is not a field that is gone.
+            if self.schema_reader is None:
+                return self._record(Receipt(
+                    key, p.proposal_hash, p.entity_urn, "FAILED",
+                    "a removal needs a schema reader to confirm the field is really "
+                    "absent; none was supplied"))
+            live = self.schema_reader(p)
+            if live is None:
+                return self._record(Receipt(
+                    key, p.proposal_hash, p.entity_urn, "CONFLICT",
+                    f"the schema could not be read in full, so whether `{p.subject}` is "
+                    f"absent is unknown; nothing removed"))
             if p.subject in live:
                 return self._record(Receipt(
                     key, p.proposal_hash, p.entity_urn, "CONFLICT",

@@ -58,26 +58,36 @@ def b2_case_insensitive(description: str, fields: list[dict]) -> list[str]:
     return [ref for ref in _referenced(description) if ref.lower() not in actual]
 
 
-def ours(description: str, fields: list[dict], entity_urn: str) -> list[str]:
-    """The full loop, for comparison on the same inputs."""
+def ours(description: str, fields: list[dict], entity_urn: str,
+         vanished: dict | None = None) -> list[str]:
+    """The full loop, for comparison on the same inputs.
+
+    `vanished` is DataHub's change log for this dataset, and it is only nominally
+    optional: an assertion needs the log to record the field leaving, so calling
+    this without one measures a detector that has been denied its evidence. It
+    went unpassed for one commit after the rename rule tightened, and the
+    comparison table silently fell to a tie with B1. The baselines are supposed
+    to lose on the merits.
+    """
     import sys
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     from stilltrue.detectors import detect_schema_break
 
-    found = detect_schema_break(entity_urn, description, fields, ["ev_bench"])
+    found = detect_schema_break(entity_urn, description, fields, ["ev_bench"],
+                                vanished=vanished)
     return [f.subject for f in found if f.verdict == "DRIFT"]
 
 
 def evaluate(description: str, fields: list[dict], entity_urn: str,
-             expected: set[str]) -> dict[str, Any]:
+             expected: set[str], vanished: dict | None = None) -> dict[str, Any]:
     """Score every baseline against the same expected set."""
     runs = {
         "B0 no context": b0_no_context(description, fields),
         "B1 coverage only": b1_coverage_only(description, fields),
         "B2 case-insensitive": b2_case_insensitive(description, fields),
-        "StillTrue": ours(description, fields, entity_urn),
+        "StillTrue": ours(description, fields, entity_urn, vanished),
     }
     scored = {}
     for name, reported in runs.items():

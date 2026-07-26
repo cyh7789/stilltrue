@@ -17,7 +17,7 @@ DataHub 裡人寫的文件與 schema 現實脫節之處，證據取自 DataHub �
 **現在的設計**：問 DataHub 什麼變了。斷言需要「這個 token 曾是這張表的欄位」的證據：
 現況 schema 有近似欄位（改名），或變更帳本記錄它離開（刪除）。其餘一律棄權。
 
-`detectors.py` 裡**零英文詞組清單**。列舉值、鄰表名、實體型別、未展開 Jinja
+`detectors.py` 裡**沒有任何英文詞表決定 drift 斷言**（`NON_FIELD_QUALIFIERS` 14 個名詞排在證據之前，只會讓 token 被跳過，不會製造 DRIFT；D3 另有英文觸發詞但不撐任何數字）。列舉值、鄰表名、實體型別、未展開 Jinja
 不會出現在 schema 變更帳本裡，所以一條排除規則都不用寫。
 
 換設計的原因寫在 memory 的 `survey-platform-surface-before-building`：
@@ -41,7 +41,7 @@ DataHub 不清理、UI 沒有欄位可以渲染、Agent Context Kit 整個 aspec
 | orphaned doc | dbt_hubspot | 4/4、432 負例 0 誤報 | 開發驗證 |
 | orphaned doc | **dbt_iterable** | **2/2、199 負例 0 誤報** | **凍結 holdout，單跑** |
 
-57 測試綠。`bench/freeze.py --check` 綠（6 檔，凍結於 commit `ca13e88`）。
+67 測試綠。`bench/freeze.py --check` 綠（9 檔，凍結於 commit `fdc2045`）。
 
 TLC 重播 2026-07-26 重跑過，涵蓋 TLC 已發布的全部 41 個月（2023-01..2026-05）。
 逐月結果在 `bench/tlc-replay-results.jsonl`；schema 快取在 `bench/oracles/tlc-schemas.json`，
@@ -113,10 +113,16 @@ TLC 重播 2026-07-26 重跑過，涵蓋 TLC 已發布的全部 41 個月（2023
 
 這些不是卡點，是最後一哩。**不要再把它們列成待辦清單當進度回報。**
 
-⚠️ 凍結生效中。再動 `detectors.py` / `adapter.py` / `evidence.py` /
-`replay_tlc.py` / `mine_orphaned_docs.py` / `run_orphan_bench.py` 任一個，
-`freeze.py --check` 就紅，holdout 的 2/2 可信度跟著沒。要改就得跑第五輪：
-修 → 重凍結 → 換新來源單跑。前四輪流程都在 git 歷史裡，可重複。
+⚠️ 凍結生效中，**九個檔案**（第五輪）：`detectors.py` / `adapter.py` / `evidence.py` /
+`replay_tlc.py` / `mine_orphaned_docs.py` / **`mine_drift_labels.py`** /
+`run_orphan_bench.py` / **`run_orphan_bench_datahub.py`** / **`select_holdout.py`**。
+動任一個 `freeze.py --check` 就紅。
+
+⚠️ **凍結的邊界比文案容易讓人以為的窄。** 沒被凍的東西包括:標籤檔本身
+（`orphaned-dbt-*.jsonl`，那是分母）、整條 TLC 線（`build_tlc_benchmark.py`、
+`scan_tlc.py`、`tlc-drift-events.json`、`tlc-schemas.json`）、baseline 線
+（`baselines.py`、`run_bench.py`）、以及 `freeze.py` 自己。
+雜湊只能證「受評程式在看到數字後沒動過」，證不到「只跑過一次」。
 
 ## 外部意見（都在 repo）
 

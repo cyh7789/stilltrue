@@ -55,13 +55,15 @@ those shapes one by one is an open-world problem. Requiring evidence closes it �
 an enumerated value never appears in a schema change log, so no rule had to be
 written to exclude it.
 
-One word list survives, and it is worth being precise about: thirteen nouns
-(`schema`, `table`, `model`, …) that suppress an *abstention* when the author
-already said what kind of thing they were naming — "the `orders` table". It can
-only turn a shrug into silence; `qualified_as_non_field` is checked before any
-evidence is consulted and can never overturn a verdict the change log supports.
-D3's lineage check does use English trigger phrases, and D3 is not one of the two
-detectors any number here rests on.
+One word list survives, and being precise about it matters more than the
+headline: fourteen nouns (`schema`, `table`, `model`, …) that skip a token when
+the author already said what kind of thing they were naming — "the `orders`
+table". `qualified_as_non_field` is checked **before** the change log, so it can
+suppress a real drift: a description saying "the `airport_fee` model applies
+to…" returns nothing even when the log records `airport_fee` leaving. That is a
+known false-negative surface and it is a word list doing it. What it cannot do
+is manufacture a DRIFT — every assertion still requires the log. D3's lineage
+check also uses English trigger phrases; D3 backs none of the numbers here.
 
 Five checks across three families, only one of which is allowed near a language
 model:
@@ -236,13 +238,22 @@ text to supply — the description is attached to a field that does not exist. T
 proposal is derived from a fresh read of the schema:
 
 - the field was **renamed** and the successor has no documentation of its own →
-  move the text onto the successor, so the knowledge survives
+  copy the text onto the successor, so the knowledge survives
 - **anything else** → remove the entry, because it describes nothing and no
   DataHub view can render it
 
 It never overwrites. If the successor already says something, that text belongs
 to whoever wrote it and merging is an editorial judgement this tool does not
 make; the orphan is removed and the rationale records why.
+
+**The copy is a copy, not a move** — one `apply` performs one write, so the
+orphaned entry is still there afterwards and the next scan reports it again. A
+second `apply` on that finding takes the removal branch (the successor is now
+documented) and clears it. Two steps, and the CLI says so; folding both writes
+into one invocation would break the one-change-per-approval rule the whole gate
+is built on. In the corpora scored here a successor is rare — every orphan in
+`dbt_iterable` and `dbt_hubspot` took the removal branch — so this is the
+uncommon path, and it is the one with no test coverage.
 
 Removal is the one deletion the Policy Gate permits, and only for this change
 type — blanking a live field's description is still refused. The safety

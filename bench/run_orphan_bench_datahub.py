@@ -28,8 +28,9 @@ passing silently. Same argument that makes `replay_tlc.py` worth its number.
 A benchmark that reports the same number as a tautological one is not obviously
 better, so `--mutate-skip-rewrite` exists to settle it. It omits the second
 ingestion, the one that takes the column away. Nothing is orphaned without it, so
-the run must score 0 -- and if it still scores 2/2, this harness is proving
-nothing either. Measured: 2/2 normally, 0/2 with the flag.
+the run has to score zero -- and if it still scores what the normal run scored,
+this harness is proving nothing either. Each report states the run that produced
+it; run it both ways to get both rows.
 
 Usage:
   python3 bench/run_orphan_bench_datahub.py <repo-clone> <labels.jsonl>
@@ -150,6 +151,7 @@ def main() -> None:
     repo, labels = Path(sys.argv[1]), Path(sys.argv[2])
     server = opt("--server", "http://localhost:8080")
     out_path = Path(opt("--out", "")) if "--out" in sys.argv else None
+    mutated = "--mutate-skip-rewrite" in sys.argv
 
     rows = [json.loads(line) for line in labels.read_text().splitlines() if line.strip()]
 
@@ -185,7 +187,7 @@ def main() -> None:
         time.sleep(SETTLE)
         annotate(server, urn, yml_descriptions_for(repo, c1, model), set(before))
         time.sleep(SETTLE)
-        if "--mutate-skip-rewrite" not in sys.argv:
+        if not mutated:
             ingest(server, name, after)      # the schema rewrite that orphans it
             time.sleep(SETTLE)
 
@@ -280,16 +282,16 @@ def main() -> None:
             "```",
             "",
             "That drops the second ingestion -- the one that takes the column out of",
-            "the schema. Nothing is orphaned without it and the score has to go to",
-            "zero. It does:",
+            "the schema. Nothing is orphaned without it, so a benchmark with any",
+            "power has to score zero.",
             "",
             "| run | orphaned documentation asserted |",
             "|---|---|",
-            f"| normal | {len(caught)}/{pos} |",
-            "| `--mutate-skip-rewrite` | 0/2 |",
+            f"| {'`--mutate-skip-rewrite`' if mutated else 'normal'} | {len(caught)}/{pos} |",
             "",
-            "The old harness returns the same 2/2 under that mutation, because it",
-            "never asks DataHub anything.",
+            "This file reports the run that produced it and nothing else. Run it both",
+            "ways to see both rows; a number this script did not measure does not",
+            "belong in a report about measuring things.",
             "",
         ]) + "\n", encoding="utf-8")
         print(f"\n-> {out_path}")

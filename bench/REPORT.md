@@ -1,6 +1,6 @@
 # Benchmark: NYC TLC
 
-> Generated 2026-07-26T05:07:16+00:00 by `bench/run_bench.py`. Rerun it to reproduce every number below.
+> Generated 2026-07-26T11:33:15+00:00 by `bench/run_bench.py`. Rerun it to reproduce every number below.
 
 **Expected findings (2):** `airport_fee`, `cbd_congestion_fee`
 

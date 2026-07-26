@@ -51,20 +51,26 @@ def main() -> None:
 
     from baselines import evaluate
     from stilltrue.adapter import ReadOnlyDataHubAdapter, authored_description
+    from stilltrue.detectors import vanished_fields
 
     expected = expected_from_oracle()
 
     with ReadOnlyDataHubAdapter(server=server) as adapter:
         entity, _ = adapter.get_entity(BENCHMARK_URN)
         schema, _ = adapter.list_schema_fields(BENCHMARK_URN)
+        fields = schema.get("fields", [])
+        # The change log is what an assertion rests on, so the comparison has to
+        # hand it over -- otherwise this scores a detector with its evidence
+        # withheld and flatters the baselines.
+        events, _ = adapter.schema_changes(BENCHMARK_URN)
+        vanished = vanished_fields(events, {f.get("fieldPath", "") for f in fields})
 
     description = authored_description(entity)
-    fields = schema.get("fields", [])
     if not fields:
         print("benchmark not loaded; run bench/oracles/build_tlc_benchmark.py first")
         sys.exit(1)
 
-    scored = evaluate(description, fields, BENCHMARK_URN, expected)
+    scored = evaluate(description, fields, BENCHMARK_URN, expected, vanished)
 
     lines = [
         "# Benchmark: NYC TLC",

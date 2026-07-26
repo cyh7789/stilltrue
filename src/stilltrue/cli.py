@@ -105,10 +105,18 @@ def scan(
             # from the editable aspect directly, because the whole point is
             # that it can name fields the schema does not.
             try:
-                authored, ev_authored = adapter.authored_field_descriptions(u)
-                found += detect_orphaned_docs(
-                    u, authored, {f.get("fieldPath", "") for f in fields},
-                    evidence_ids + [ev_authored])
+                complete = _complete_field_set(schema)
+                if complete is None:
+                    # A field left out of a short page looks exactly like a field
+                    # the schema does not have, and that is the whole question
+                    # here. Reporting on a partial read invents orphans.
+                    typer.echo(f"  {u}: schema read incomplete "
+                               f"({schema.get('returned')} of {schema.get('totalFields')}), "
+                               f"skipping the orphaned-doc check")
+                else:
+                    authored, ev_authored = adapter.authored_field_descriptions(u)
+                    found += detect_orphaned_docs(u, authored, complete,
+                                                  evidence_ids + [ev_authored])
             except Exception:
                 pass
 
@@ -168,6 +176,31 @@ def verify(run: Optional[str] = typer.Option(None, help="Run id; defaults to the
     raise typer.Exit(0 if ok else 1)
 
 
+def _complete_field_set(payload: dict) -> set[str] | None:
+    """The dataset's fields, or None when the read did not return all of them.
+
+    `list_schema_fields` pages: it answers with `totalFields`, `returned` and
+    `remainingCount`, and stops early at a token budget as well as at the limit.
+    A field left out of a truncated page is indistinguishable from one the schema
+    does not have -- which is the exact question the orphan detector and the
+    removal guard both ask. Treating a short read as an answer means a live,
+    documented column reads as an orphan and its description gets deleted.
+    Measured on a 120-column dataset: returned 100, remainingCount 20, and
+    `col_105` -- present and documented -- came back as DRIFT.
+
+    So an incomplete read has no answer to give, and says so.
+    """
+    fields = payload.get("fields") or []
+    if not fields:
+        return None
+    if payload.get("remainingCount"):
+        return None
+    total = payload.get("totalFields")
+    if total is not None and len(fields) < total:
+        return None
+    return {f.get("fieldPath", "") for f in fields}
+
+
 def _orphan_proposal(adapter: ReadOnlyDataHubAdapter, f: dict) -> Proposal:
     """What to do about documentation attached to a field that is gone.
 
@@ -187,7 +220,13 @@ def _orphan_proposal(adapter: ReadOnlyDataHubAdapter, f: dict) -> Proposal:
 
     urn, orphan = f["entity_urn"], f["subject"]
     schema, ev_s = adapter.list_schema_fields(urn)
-    live = {x.get("fieldPath", "") for x in schema.get("fields", [])}
+    live = _complete_field_set(schema)
+    if live is None:
+        raise typer.BadParameter(
+            f"the schema read for {urn} came back incomplete "
+            f"({schema.get('returned')} of {schema.get('totalFields')} fields), so "
+            f"whether `{orphan}` is really absent cannot be decided; refusing to act"
+        )
     documented = {x.get("fieldPath", ""): (x.get("description") or "")
                   for x in schema.get("fields", [])}
     authored, ev_a = adapter.authored_field_descriptions(urn)
@@ -198,6 +237,11 @@ def _orphan_proposal(adapter: ReadOnlyDataHubAdapter, f: dict) -> Proposal:
 
     if successor and not documented.get(successor, "").strip() \
             and not authored.get(successor, "").strip():
+        typer.echo(
+            f"note: this copies the text onto `{successor}`. One apply is one write, so "
+            f"the entry on `{orphan}` stays until you apply the finding again -- that "
+            f"second run takes the removal branch."
+        )
         return Proposal(
             entity_urn=urn, aspect="field_description", verdict="DRIFT",
             subject=successor, before_value="", after_value=text,
@@ -298,11 +342,15 @@ def apply(
             current, _ = a.get_entity(prop.entity_urn)
             return authored_description(current)
 
-    def live_fields(prop: Proposal) -> set[str]:
-        """Which fields the schema has right now -- a removal turns on this."""
+    def live_fields(prop: Proposal) -> set[str] | None:
+        """Which fields the schema has right now -- a removal turns on this.
+
+        None when the read was short, which the executor must treat as a refusal
+        rather than as an empty schema.
+        """
         with ReadOnlyDataHubAdapter(server=server) as a:
             schema, _ = a.list_schema_fields(prop.entity_urn)
-            return {x.get("fieldPath", "") for x in schema.get("fields", [])}
+            return _complete_field_set(schema)
 
     executor = WriteExecutor(reader=reread, server=server, dry_run=not commit,
                              schema_reader=live_fields)

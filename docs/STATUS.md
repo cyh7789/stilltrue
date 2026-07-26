@@ -1,7 +1,7 @@
 # STATUS v3 — 實作現況
 
 > 事實描述，查核日 2026-07-26。距提交截止 2026-08-10 17:00 EDT 剩 15 天。
-> repo：`cyh7789/stilltrue`（private），11 個 commit，42 個測試通過。
+> repo：`cyh7789/stilltrue`（private），49 個 commit，67 個測試通過。
 > ⚠️ 對外名 **StillTrue**，但**程式碼內套件名與 CLI 仍是 `stilltrue`**，尚未統一。
 
 ## 1. 題目與賽道
@@ -19,7 +19,7 @@
 |---|---|
 | `adapter.py` | 唯讀 adapter。Kit 的 5 個讀取工具 + 兩個 Kit 拿不到的：`schema_changes()` 讀 DataHub timeline（Kit 無此工具）、`authored_field_descriptions()` 讀 editable 欄位描述（Kit 會丟掉，見上游 PR #18628）。寫入工具未 import |
 | `evidence.py` | 證據紀錄，內容定址 id，含 `captured_at` |
-| `detectors.py` | **全部改為證據閘門，零英文詞組清單**。`vanished_fields()` 讀 DataHub 變更帳本並用現況 schema 過濾掉位置比對造成的假改名；`detect_schema_break()` 只在有改名候選或帳本記錄離開時斷言；`detect_orphaned_docs()` 比對 editable 描述與現況 schema；`detect_lineage_drift()` |
+| `detectors.py` | **全部改為證據閘門**（`NON_FIELD_QUALIFIERS` 14 個名詞仍在，排在證據之前，只能跳過 token 不能製造 DRIFT）。`vanished_fields()` 讀 DataHub 變更帳本並用現況 schema 過濾掉位置比對造成的假改名；`detect_schema_break()` 只在有改名候選或帳本記錄離開時斷言；`detect_orphaned_docs()` 比對 editable 描述與現況 schema；`detect_lineage_drift()` |
 | `semantic.py` | D5，未接真實 LLM 也未接 CLI（`get_dataset_queries` 全庫回 0） |
 | `proposal.py` | Proposal + PolicyGate + `check_approval()`（內容鎖，非授權邊界） |
 | `executor.py` | 寫前重讀、冪等鍵、寫後回讀 |
@@ -75,7 +75,9 @@ read-back VERIFIED → 重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT�
 
 | PR | repo | 狀態 |
 |---|---|---|
-| #18622 `feat(agent-context): expose description resolution for read paths` | datahub-project/datahub | open，CI 全綠 |
+| #18622 dataset 層描述解析 | datahub-project/datahub | open，CI 零失敗 |
+| #18628 欄位層 editable 描述被 Kit 丟掉 | datahub-project/datahub | open，CI 零失敗 |
+| #18630 `list_schema_fields` 對無 schema 的 dataset 崩潰 | datahub-project/datahub | open，CI 零失敗 |
 | #49 `feat: add datahub-context-drift skill` | datahub-project/datahub-skills | open |
 
 ## 6. 未完成／未實作（完整清單）
@@ -103,7 +105,7 @@ read-back VERIFIED → 重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT�
 11. demo 影片未錄
 12. repo 為 private，未轉 public
 13. Devpost 表單未提交
-14. L3 可見證據未產出：DataHub UI 截圖／錄影 + 受影響 URN 清單
+14. ~~L3 可見證據未產出~~ — **已完成**：`docs/L3-EVIDENCE.md` + `docs/evidence/*.png`，截圖由 `scripts/capture_ui.py` 從 URN 產生
 15. README 首屏無 20 秒動圖（SPEC §5.2 要求）
 
 **已知失真：**
