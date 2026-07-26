@@ -63,7 +63,7 @@ SELECTION_RULE = {
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
-    "round": 5,
+    "round": 6,
     "history": (
         "Rounds 1-3 graded detectors and oracles that have since been replaced. The old "
         "oracle labelled 'descriptions that were later edited', which measures doc-editing "
@@ -90,6 +90,17 @@ SELECTION_RULE = {
         "harness that scores it now was written after its result was known. What supports "
         "the current numbers is the mutation (--mutate-skip-rewrite scores 0/2), not the "
         "order of operations."
+    ),
+    "round_6_scope": (
+        "One graded file changed: run_orphan_bench_datahub.py. Its report generator "
+        "emitted two literals it had never measured -- a '0/2' mutation row and the "
+        "sentence 'the old harness returns the same 2/2'. The first is impossible on a "
+        "corpus with four positives, and the second describes an argument the old "
+        "harness silently ignores, since it has no such flag. A submission whose case "
+        "is that its numbers are measured cannot ship a constant inside a generated "
+        "report. Each report now states only the run that produced it. Scores are "
+        "unchanged, because the change is to what gets written down, not to what gets "
+        "counted; the other eight hashes are byte-identical."
     ),
 }
 
