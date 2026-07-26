@@ -1,6 +1,7 @@
 # Demo video — final script
 
-**2:50 total. 428 words of narration at ~150 wpm.** Supersedes `VIDEO-SCRIPT-a.md`
+**2:50 total. 440 words of narration — 155 wpm, which is brisk; the per-shot
+counts below are what to trim against.** Supersedes `VIDEO-SCRIPT-a.md`
 and `-b.md`; the verdict that chose between them is `REVIEW-video-codex.md`.
 
 Structure follows A: the problem and the result land in the first 21 seconds,
