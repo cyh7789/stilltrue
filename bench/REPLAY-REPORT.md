@@ -25,8 +25,24 @@ ours.
 |---|---|
 | Months replayed | **41** (2023-01 → 2026-05, every month the TLC has published) |
 | Months scored exactly right | **41/41** |
-| Drift caught in the month it happened | **2/2** |
 | False alarms | **0** |
+
+Broken out, because "41/41" on its own suggests more variety than there is:
+
+| | |
+|---|---|
+| Quiet before anything happened (2023-01) | 1/1 |
+| The rename caught in the month it happened (2023-02) | 1/1 |
+| Still reported every month after, never withdrawn | 39/39 |
+
+**What this harness does not score.** The TLC's other 2025-01 change was an
+*addition* — `cbd_congestion_fee` — with nothing removed. `expected_state()`
+unions the `removed` fields only, and the run keeps `D1_SCHEMA_BREAK` findings
+only, so that month's score is just the `airport_fee` state being right again.
+An earlier version of this table called that "drift caught in the month it
+happened: 2/2", which counted an event the harness never looked at. The
+undocumented-column detector does fire on `cbd_congestion_fee` — visible in
+`docs/L3-EVIDENCE.md` — but it is not scored here.
 
 Scored on *state*, not events. `airport_fee` was renamed in February 2023 and
 the description was never corrected, so the right answer is to report it in

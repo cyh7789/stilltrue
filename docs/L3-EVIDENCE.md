@@ -181,13 +181,21 @@ curl -s -u datahub:datahub \
                   pickup zone, so filter it out before averaging.'
 ```
 
-And it is on none of the four screenshots above, including the two Columns
-frames that were filtered to `airport` — because the UI renders descriptions per
-*current* field, and a field that is gone has nothing to render into. The Agent
-Context Kit drops the aspect earlier still.
+And it is on none of the four screenshots above, including the two Columns frames
+filtered to `airport`.
 
-So the sentence is retrievable, wrong, and unreachable by every route a person
-or an agent would normally take. `D1_ORPHANED_DOC` is the route.
+Absence from four screenshots is not by itself a proof, so here is the mechanism
+it illustrates: DataHub's Columns tab iterates the *current* `schemaMetadata.fields`
+and merges an `editableSchemaMetadata` entry onto a field it finds by `fieldPath`.
+A description whose `fieldPath` matches no current field is never reached by that
+loop — there is no row for it to render into. The Agent Context Kit drops the
+aspect earlier still (`clean_get_entities_response` deletes it, and nothing
+merges it — [datahub#18628](https://github.com/datahub-project/datahub/pull/18628)).
+
+The precise claim, then, and it is narrower than "invisible": **DataHub's standard
+dataset pages do not render it, and an agent built on the Kit never receives it.**
+The aspect API returns it fine — the `curl` above is that route. `D1_ORPHANED_DOC`
+is what makes it visible to someone who is not already querying aspects by hand.
 
 ---
 

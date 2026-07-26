@@ -29,12 +29,15 @@ ROOT = Path(__file__).resolve().parent.parent
 FREEZE_FILE = ROOT / "bench" / "freeze.json"
 
 FROZEN_FILES = [
-    "src/stilltrue/detectors.py",          # the rules themselves
-    "src/stilltrue/adapter.py",            # which text gets judged, and the change-log read
-    "src/stilltrue/evidence.py",           # what counts as a citation
-    "bench/oracles/replay_tlc.py",         # how a replay is scored
-    "bench/oracles/mine_orphaned_docs.py", # what counts as orphaned documentation
-    "bench/run_orphan_bench.py",           # how orphan labels are scored
+    "src/stilltrue/detectors.py",             # the rules themselves
+    "src/stilltrue/adapter.py",               # which text gets judged, and the change-log read
+    "src/stilltrue/evidence.py",              # what counts as a citation
+    "bench/oracles/replay_tlc.py",            # how a replay is scored
+    "bench/oracles/mine_orphaned_docs.py",    # what counts as orphaned documentation
+    "bench/oracles/mine_drift_labels.py",     # how a model's columns are read out of git
+    "bench/run_orphan_bench.py",              # superseded; kept so its result stays checkable
+    "bench/run_orphan_bench_datahub.py",      # how orphan labels are scored now
+    "bench/select_holdout.py",                # which source gets graded
 ]
 
 # Written before any candidate repository was inspected. Mechanical on purpose:
@@ -60,7 +63,7 @@ SELECTION_RULE = {
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
-    "round": 4,
+    "round": 5,
     "history": (
         "Rounds 1-3 graded detectors and oracles that have since been replaced. The old "
         "oracle labelled 'descriptions that were later edited', which measures doc-editing "
@@ -69,6 +72,24 @@ SELECTION_RULE = {
         "at either end of the window. The current oracle labels a column that left the "
         "model's SQL whose description outlived it, which git records without anyone "
         "judging intent. Sources touched under any earlier round are excluded above."
+    ),
+    "round_5_scope": (
+        "Round 5 widened coverage and fixed a rule; it does not re-bless anything. Two "
+        "changes to what is frozen: mine_drift_labels.py is now included, because both the "
+        "round-4 miner and scorer imported it while it sat outside the hashes, and "
+        "select_holdout.py is included, because it decides which source gets graded. Two "
+        "additions reflect the scoring move to run_orphan_bench_datahub.py, which replays "
+        "into DataHub and reads back through the adapter -- the round-4 scorer handed the "
+        "detector the labelled column, the labelled description and the after-schema, "
+        "which is its own decision rule restated, and could not have returned anything "
+        "else. detectors.py changed too: a lookalike column in the current schema no "
+        "longer asserts a rename on its own, because resemblance is not evidence the "
+        "token was ever a field here; the change log has to record the departure first. "
+        "The TLC replay is 41/41 before and after that change. NOTHING here restores "
+        "blindness: dbt_iterable was a blind holdout for the round-4 harness, and the "
+        "harness that scores it now was written after its result was known. What supports "
+        "the current numbers is the mutation (--mutate-skip-rewrite scores 0/2), not the "
+        "order of operations."
     ),
 }
 

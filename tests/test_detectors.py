@@ -26,7 +26,15 @@ def test_tlc_case_rename_is_detected():
     so its own normalization erased the case difference.
     """
     fields = [{"fieldPath": "Airport_fee", "description": "Airport fee", "nativeDataType": "double"}]
-    found = _drift(detect_schema_break(TLC_URN, "Fare breakdown includes airport_fee for LGA/JFK pickups.", fields, ["ev1"]))
+    # DataHub's change log for this dataset records the departure; the schema
+    # supplies the successor. Both are needed -- the resemblance alone would not
+    # establish that `airport_fee` was ever a column here.
+    gone = {"airport_fee": VanishedField(
+        name="airport_fee", operation="REMOVE", observed_at=1785043063766,
+        semantic_version="1.0.0", datahub_says="removal of field: 'airport_fee'")}
+    found = _drift(detect_schema_break(
+        TLC_URN, "Fare breakdown includes airport_fee for LGA/JFK pickups.", fields, ["ev1"],
+        vanished=gone))
 
     assert len(found) == 1
     assert found[0].subject == "airport_fee"
@@ -135,7 +143,11 @@ def test_a_verified_reference_never_becomes_a_write_proposal():
 def test_case_variant_is_drift_not_current():
     """The TLC event must not be swallowed by the new CURRENT path."""
     fields = [{"fieldPath": "Airport_fee", "description": "", "nativeDataType": "double"}]
-    found = detect_schema_break(TLC_URN, "Includes `airport_fee`.", fields, ["ev1"])
+    gone = {"airport_fee": VanishedField(
+        name="airport_fee", operation="REMOVE", observed_at=1785043063766,
+        semantic_version="1.0.0", datahub_says="removal of field: 'airport_fee'")}
+    found = detect_schema_break(TLC_URN, "Includes `airport_fee`.", fields, ["ev1"],
+                                vanished=gone)
 
     assert [f.verdict for f in found if f.subject == "airport_fee"] == ["DRIFT"]
 
@@ -202,10 +214,39 @@ def _gone(name, operation="REMOVE"):
                                 datahub_says=f"removal of field: '{name}'")}
 
 
-def test_a_rename_candidate_in_the_current_schema_still_asserts():
-    """The TLC event, and it must survive with no change history at all."""
+def test_a_rename_asserts_when_the_change_log_records_the_departure():
+    """The TLC event: the log says it left, the schema says what replaced it."""
     assert _verdicts("Includes `airport_fee`.", "Airport_fee", "fare_amount",
-                     vanished=None, subject="airport_fee") == ["DRIFT"]
+                     vanished=_gone("airport_fee"), subject="airport_fee") == ["DRIFT"]
+
+
+def test_a_rename_names_the_successor_from_the_current_schema():
+    """The near-match is how the successor gets named, once departure is proven."""
+    fields = _fields("Airport_fee", "fare_amount")
+    fields[0] = {**fields[0], "description": "Includes `airport_fee`."}
+    f = [x for x in detect_schema_break(DBT_URN, "", fields, ["ev"],
+                                        vanished=_gone("airport_fee"))
+         if x.subject == "airport_fee"][0]
+    assert f.suspected_rename == "Airport_fee"
+
+
+def test_a_lookalike_field_alone_is_not_proof_the_token_was_ever_a_field():
+    """A similarly named column says nothing about this token's history.
+
+    `deal_id` existing does not establish that `DEAL_ID` was ever a field here:
+    it could be a value, a neighbouring model, or a word the author capitalised.
+    Asserting on the resemblance alone is the string-similarity guess this
+    design was built to remove -- it survived because the rename branch was
+    checked before the change log was consulted at all.
+    """
+    assert _verdicts("Grouped by `DEAL_ID`.", "deal_id", "amount",
+                     vanished={}, subject="DEAL_ID") == ["INSUFFICIENT_EVIDENCE"]
+
+
+def test_a_lookalike_abstains_when_no_change_history_was_available():
+    """Not having looked is not the same as having looked and found nothing."""
+    assert _verdicts("Includes `airport_fee`.", "Airport_fee", "fare_amount",
+                     vanished=None, subject="airport_fee") == ["INSUFFICIENT_EVIDENCE"]
 
 
 def test_a_field_datahub_says_was_removed_asserts():

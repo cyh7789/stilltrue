@@ -12,6 +12,22 @@ schema on top -- and the detector runs on whatever
 |---|---|
 | Orphaned documentation asserted | **4/4** |
 | False alarms on correct documentation | **0/432** |
+| Orphans the label file missed | **4** |
+| Assertions nothing accounts for | **0** |
+
+The last two rows exist because scoring only the labelled column would
+hide a detector that fires on everything. Anything else the detector
+says is checked against the same git history the labels come from: if
+the column was in the model's SQL at the earlier commit and gone at the
+later one, the assertion is right and the label file simply has no row
+for it -- `mine_orphaned_docs.py` dedupes by `(model, column)` and keeps
+the first row it built, so a column that is current at one commit and
+orphaned at a later one never gets a second entry. Only the final row
+would be a false positive.
+
+Each case also gets its own dataset name, keyed to the commits that
+define it: `editableSchemaMetadata` is never cleared, so a shared URN
+would carry one case's descriptions into the next.
 
 ## Checking that this benchmark can fail
 

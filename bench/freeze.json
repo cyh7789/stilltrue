@@ -1,13 +1,16 @@
 {
-  "frozen_at": "2026-07-26T06:33:19+00:00",
-  "git_commit": "ca13e88b258b4a04279b908653270caa29c6650a",
+  "frozen_at": "2026-07-26T09:54:59+00:00",
+  "git_commit": "fdc204558b59397443003d5ca6ba7e93abf2eb4a",
   "files": {
-    "src/stilltrue/detectors.py": "59448b6a45d549783f85299142af1f6675c16d8c7672867ad4cf335f44e3bed0",
+    "src/stilltrue/detectors.py": "759e33fe9e380ea8d5c6a89b3992c61e5d8aaed66dade5e76b430e2b04bdc761",
     "src/stilltrue/adapter.py": "69bc329d4285de93dcbab3177635a18bc5551ec6685011788ed4a1ca92ac4dd6",
     "src/stilltrue/evidence.py": "b9c6e08597a95b9adf572fbd527a6be199341552ae156b24863c34d71f692d94",
     "bench/oracles/replay_tlc.py": "6a4f8dcd0b8a791eed0633c1011c1527db12c9579185cfa1b78d8220a9135b45",
     "bench/oracles/mine_orphaned_docs.py": "993d6da763d0379556f5b0173196d40037926779c7b5336991039fcb596f167f",
-    "bench/run_orphan_bench.py": "8e5b5a7cb299e57f59b63f9c291d54eb07cd0996881807c108a51f295ad0079e"
+    "bench/oracles/mine_drift_labels.py": "73b96b41dd64cd55f67cc16e696bc2b2171177d7003a61fff855b27c37f95069",
+    "bench/run_orphan_bench.py": "8e5b5a7cb299e57f59b63f9c291d54eb07cd0996881807c108a51f295ad0079e",
+    "bench/run_orphan_bench_datahub.py": "2eb195b7fe7fe32d279aed99dd60938ae5db62419184dfc62b77df9ba6f9e0a3",
+    "bench/select_holdout.py": "c01de86655ffc58e81288bb7c4621082bf6db53d8130f405ab1db816a4b6afd1"
   },
   "selection_rule": {
     "population": "public repositories under github.com/fivetran whose name starts with 'dbt_'",
@@ -30,8 +33,9 @@
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
-    "round": 4,
-    "history": "Rounds 1-3 graded detectors and oracles that have since been replaced. The old oracle labelled 'descriptions that were later edited', which measures doc-editing behaviour rather than what this system decides -- in 9 of dbt_shopify's 10 identifier-change positives the referenced token was never a column of that model at either end of the window. The current oracle labels a column that left the model's SQL whose description outlived it, which git records without anyone judging intent. Sources touched under any earlier round are excluded above."
+    "round": 5,
+    "history": "Rounds 1-3 graded detectors and oracles that have since been replaced. The old oracle labelled 'descriptions that were later edited', which measures doc-editing behaviour rather than what this system decides -- in 9 of dbt_shopify's 10 identifier-change positives the referenced token was never a column of that model at either end of the window. The current oracle labels a column that left the model's SQL whose description outlived it, which git records without anyone judging intent. Sources touched under any earlier round are excluded above.",
+    "round_5_scope": "Round 5 widened coverage and fixed a rule; it does not re-bless anything. Two changes to what is frozen: mine_drift_labels.py is now included, because both the round-4 miner and scorer imported it while it sat outside the hashes, and select_holdout.py is included, because it decides which source gets graded. Two additions reflect the scoring move to run_orphan_bench_datahub.py, which replays into DataHub and reads back through the adapter -- the round-4 scorer handed the detector the labelled column, the labelled description and the after-schema, which is its own decision rule restated, and could not have returned anything else. detectors.py changed too: a lookalike column in the current schema no longer asserts a rename on its own, because resemblance is not evidence the token was ever a field here; the change log has to record the departure first. The TLC replay is 41/41 before and after that change. NOTHING here restores blindness: dbt_iterable was a blind holdout for the round-4 harness, and the harness that scores it now was written after its result was known. What supports the current numbers is the mutation (--mutate-skip-rewrite scores 0/2), not the order of operations."
   },
   "note": "The NYC TLC replay is a development benchmark and is NOT covered by this freeze -- that data shaped this detector. See docs/VALIDATION-INTEGRITY.md."
 }

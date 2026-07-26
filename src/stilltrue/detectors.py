@@ -206,15 +206,17 @@ def detect_schema_break(
 ) -> list[Finding]:
     """D1: does the prose still name fields this dataset no longer has?
 
-    An assertion needs proof the token was a field here. Two things qualify and
-    both come from DataHub:
+    An assertion needs proof the token was a field here, and only one thing
+    counts as that proof: DataHub's change log recording it leave. The current
+    schema then supplies the successor's name when there is one --
 
-      a near-match in the current schema   the field was renamed (TLC's
-                                           airport_fee -> Airport_fee)
-      a departure in the change log        the field was deleted, with no
-                                           similarly-named successor to point at
+      in the change log, near-match in schema   renamed (TLC's airport_fee
+                                                -> Airport_fee)
+      in the change log, no near-match          deleted, nothing to point at
+      near-match but not in the change log      abstain: a lookalike column is
+                                                not a history
 
-    Everything else abstains. That is the whole rule, and it is why there is no
+    -- and everything else abstains. That is the whole rule, and it is why there is no
     list of English phrases in this module any more. Earlier versions asserted on
     any unresolved identifier and then subtracted the shapes that turned out to
     be prose -- enumerated values, neighbouring tables, entity types, unexpanded
@@ -263,16 +265,28 @@ def detect_schema_break(
                 continue
 
             candidate = _rename_candidate(ref, actual)
-            if candidate:
+            if ref in gone:
+                v = gone[ref]
+                left = (f"DataHub's change log records it leaving at v{v.semantic_version}: "
+                        f"{v.datahub_says}")
                 add(verdict="DRIFT", subject=ref, suspected_rename=candidate,
                     claim=f"{where} references `{ref}`",
-                    reality=f"the schema has no `{ref}`, but it does have `{candidate}`")
-            elif ref in gone:
-                v = gone[ref]
-                add(verdict="DRIFT", subject=ref,
+                    reality=f"{left}; the schema now has `{candidate}`" if candidate else left)
+            elif candidate:
+                # A field that merely looks like this token is not evidence the
+                # token was ever a field here: `deal_id` existing says nothing
+                # about `DEAL_ID` having been a column. Resemblance is only good
+                # for naming the successor, and only once the change log has
+                # established that something departed. Checking it before the
+                # log -- which is what this branch used to do -- let the string
+                # similarity this design replaced go on deciding verdicts.
+                add(verdict="INSUFFICIENT_EVIDENCE", subject=ref, suspected_rename=candidate,
                     claim=f"{where} references `{ref}`",
-                    reality=f"DataHub's change log records it leaving at v{v.semantic_version}: "
-                            f"{v.datahub_says}")
+                    reality=(f"the schema has `{candidate}`, but nothing records `{ref}` "
+                             f"ever being a field here" if vanished is not None else
+                             f"the schema has `{candidate}`, and no change history was "
+                             f"available to say whether `{ref}` ever was one"),
+                    confidence="medium")
             else:
                 seen = ("no change history was available for this dataset"
                         if vanished is None

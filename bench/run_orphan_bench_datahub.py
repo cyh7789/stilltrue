@@ -61,8 +61,20 @@ from stilltrue.detectors import detect_orphaned_docs  # noqa: E402
 SETTLE = 2.0            # DataHub applies an upsert asynchronously
 
 
-def urn_for(repo: str, model: str) -> str:
-    return f"urn:li:dataset:(urn:li:dataPlatform:dbt,{repo}.{model},PROD)"
+def case_name(repo: str, model: str, *commits: str) -> str:
+    """A dataset name unique to this case.
+
+    Reusing one URN across cases would carry `editableSchemaMetadata` forward:
+    nothing clears that aspect, so a description written for an earlier case
+    stays and gets read back during a later one. A positive could then be
+    credited to residue, and a negative charged for it. The commits that define
+    the case go in the name.
+    """
+    return f"orphanbench.{repo}.{model}__" + "_".join(c[:7] for c in commits)
+
+
+def urn_for(name: str) -> str:
+    return f"urn:li:dataset:(urn:li:dataPlatform:dbt,{name},PROD)"
 
 
 def ingest(server: str, urn_name: str, columns: list[str]) -> None:
@@ -152,14 +164,22 @@ def main() -> None:
             negatives[(r["model"], r["commit"])].append(r)
 
     caught, missed, quiet, false_alarms = [], [], [], []
+    # Asserted without a label saying so. Split by whether the same git history
+    # the labels come from backs it up: the miner dedupes by (model, column) and
+    # keeps the first row it built, so a column that is `current` at one commit
+    # and orphaned at a later one only ever gets the first of those. That is a
+    # gap in the label file, not a wrong answer, and the two have to be counted
+    # apart or a real false positive would hide among them.
+    unlabelled_but_real: list[tuple[str, str]] = []
+    unexplained: list[tuple[str, str]] = []
 
     for (model, c1, c2), group in sorted(positives.items()):
         before = sql_columns_at(repo, c1, model) or []
         after = sql_columns_at(repo, c2, model) or []
         if not before or not after:
             continue
-        name = f"orphanbench.{repo.name}.{model}"
-        urn = urn_for(f"orphanbench.{repo.name}", model)
+        name = case_name(repo.name, model, c1, c2)
+        urn = urn_for(name)
 
         ingest(server, name, before)
         time.sleep(SETTLE)
@@ -170,17 +190,21 @@ def main() -> None:
             time.sleep(SETTLE)
 
         said = asserted_columns(server, urn)
+        expected = {r["column"] for r in group}
         for r in group:
             (caught if r["column"] in said else missed).append(r)
+        for c in sorted(said - expected):
+            departed = c in set(before) and c not in set(after)
+            (unlabelled_but_real if departed else unexplained).append((model, c))
         print(f"  + {model}: DataHub returned drift on {sorted(said) or '-'}; "
-              f"expected {sorted(r['column'] for r in group)}")
+              f"expected {sorted(expected)}")
 
     for (model, commit), group in sorted(negatives.items()):
         columns = sql_columns_at(repo, commit, model) or []
         if not columns:
             continue
-        name = f"orphanbench.{repo.name}.{model}"
-        urn = urn_for(f"orphanbench.{repo.name}", model)
+        name = case_name(repo.name, model, commit)
+        urn = urn_for(name)
 
         ingest(server, name, columns)
         time.sleep(SETTLE)
@@ -190,6 +214,9 @@ def main() -> None:
         said = asserted_columns(server, urn)
         for r in group:
             (false_alarms if r["column"] in said else quiet).append(r)
+        # Nothing departed in this case -- one schema, no rewrite -- so anything
+        # asserted here is unexplained by definition.
+        unexplained += [(model, c) for c in sorted(said - {r["column"] for r in group})]
 
     pos, neg = len(caught) + len(missed), len(quiet) + len(false_alarms)
     print(f"\nsource: {repo.name}  (through DataHub at {server})")
@@ -199,6 +226,13 @@ def main() -> None:
     print(f"  false alarms on correct documentation: {len(false_alarms)}/{neg}")
     for r in false_alarms[:5]:
         print(f"    false alarm: {r['model']}.{r['column']}")
+    print(f"  orphans the label file missed (git confirms the departure): "
+          f"{len(unlabelled_but_real)}")
+    for model, column in unlabelled_but_real[:10]:
+        print(f"    unlabelled: {model}.{column}")
+    print(f"  assertions nothing accounts for: {len(unexplained)}")
+    for model, column in unexplained[:10]:
+        print(f"    unexplained: {model}.{column}")
 
     if out_path:
         out_path.write_text("\n".join([
@@ -216,6 +250,22 @@ def main() -> None:
             "|---|---|",
             f"| Orphaned documentation asserted | **{len(caught)}/{pos}** |",
             f"| False alarms on correct documentation | **{len(false_alarms)}/{neg}** |",
+            f"| Orphans the label file missed | **{len(unlabelled_but_real)}** |",
+            f"| Assertions nothing accounts for | **{len(unexplained)}** |",
+            "",
+            "The last two rows exist because scoring only the labelled column would",
+            "hide a detector that fires on everything. Anything else the detector",
+            "says is checked against the same git history the labels come from: if",
+            "the column was in the model's SQL at the earlier commit and gone at the",
+            "later one, the assertion is right and the label file simply has no row",
+            "for it -- `mine_orphaned_docs.py` dedupes by `(model, column)` and keeps",
+            "the first row it built, so a column that is current at one commit and",
+            "orphaned at a later one never gets a second entry. Only the final row",
+            "would be a false positive.",
+            "",
+            "Each case also gets its own dataset name, keyed to the commits that",
+            "define it: `editableSchemaMetadata` is never cleared, so a shared URN",
+            "would carry one case's descriptions into the next.",
             "",
             "## Checking that this benchmark can fail",
             "",
