@@ -59,9 +59,17 @@ python3 bench/run_orphan_bench_datahub.py /tmp/dbt_iterable bench/oracles/orphan
 ```
 
 Each pass replays ~50 cases through DataHub, so allow several minutes per run —
-this is not a shot you can improvise on the day. The committed table in
-`bench/HOLDOUT-orphan-iterable-datahub.md` is the fallback and loses only the
-live-terminal feel.
+this is not a shot you can improvise on the day. Both directions were run
+end to end on 2026-07-26 against the full labels file, so the frames are known
+to exist:
+
+```
+normal    2/2 asserted, 0/199 false alarms, 0 unexplained
+mutated   0/2 asserted, 0/199 false alarms, 0 unexplained
+```
+
+The committed table in `bench/HOLDOUT-orphan-iterable-datahub.md` is the fallback
+and loses only the live-terminal feel.
 
 **Shot 10** — `python3 scripts/capture_prs.py` writes the four PR pages to
 `docs/evidence/prs/`. Committed; no browser needed on the day.
