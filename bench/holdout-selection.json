@@ -1,0 +1,12 @@
+{
+  "selected": "dbt_fivetran_log",
+  "url": "https://github.com/fivetran/dbt_fivetran_log",
+  "licence": "Apache-2.0",
+  "commits": 744,
+  "months": 71,
+  "descriptions": 364,
+  "positives": 109,
+  "negatives": 109,
+  "labels_file": "drift-labels-dbt-fivetran-log.jsonl",
+  "frozen_rule_commit": "f1661c0e7d0e9e15f9df325974953d60e0076d6c"
+}
