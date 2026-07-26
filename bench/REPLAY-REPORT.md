@@ -60,13 +60,25 @@ OK   2026-05  expected ['airport_fee']  asserted ['airport_fee']
 
 ## What the evidence looks like
 
-The claim is not "this identifier looks unresolved". It is DataHub's own record:
+The claim is not "this identifier looks unresolved". It is DataHub's own record,
+quoted verbatim, with the successor's name taken from the current schema:
 
 ```
-the schema has no `airport_fee`, but it does have `Airport_fee`
+DataHub's change log records it leaving at v9.0.0-computed: A forwards &
+backwards compatible change due to renaming of the field 'airport_fee to
+cbd_congestion_fee'.; the schema now has `Airport_fee`
 ```
 
-and, for deletions with no successor to point at, the change log verbatim:
+**DataHub is half wrong there and the quote is left as it came.** `airport_fee`
+was not renamed to `cbd_congestion_fee`; DataHub's differ matches schema versions
+by position, so a month that drops one column, renames another and appends a
+third emits renames nobody performed. The half the log is reliable for is that
+`airport_fee` left at that version, and that is the only half an assertion rests
+on — the successor comes from the current schema. `vanished_fields()` further
+drops any claimed departure whose field is still present, which removes the
+phantom side of the differ's output.
+
+For a deletion with no successor the reality reads as the log alone:
 
 ```
 DataHub's change log records it leaving at v1.0.0:

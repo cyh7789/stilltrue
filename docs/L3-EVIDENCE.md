@@ -52,7 +52,9 @@ run 94b7e03ee841: scanning 1 datasets
   3 drift, 5 verified current, 0 abstained (8 checks)
 
   [94b7e03ee841-0000] D1_SCHEMA_BREAK airport_fee -> likely renamed to `Airport_fee`
-      the schema has no `airport_fee`, but it does have `Airport_fee`
+      DataHub's change log records it leaving at v10.0.0-computed: A forwards &
+      backwards compatible change due to renaming of the field 'airport_fee to
+      cbd_congestion_fee'.; the schema now has `Airport_fee`
   [94b7e03ee841-0006] D1_UNDOCUMENTED cbd_congestion_fee
       field `cbd_congestion_fee` (double) exists in the schema but has no description
   [94b7e03ee841-0007] D1_ORPHANED_DOC airport_fee
@@ -64,6 +66,21 @@ Five other identifiers in the same description — `fare_amount`,
 `improvement_surcharge`, `mta_tax`, `tip_amount`, `tolls_amount` — are checked
 and come back CURRENT. Nothing is abstained on here, because DataHub's change
 log covers this dataset and every token can be decided.
+
+**Read that first finding carefully, because DataHub is half wrong in it.** The
+change log says `airport_fee` was renamed to `cbd_congestion_fee`. It was not —
+that pairing is an artefact of DataHub's schema differ, which matches versions by
+position, so a month that drops a column, renames another and appends a third
+produces renames nobody performed. The quote is reproduced verbatim rather than
+tidied up, because the evidence a tool cites should be what the source actually
+said.
+
+What the log *is* reliable for is the fact StillTrue needs: `airport_fee` left
+this dataset at that version. The successor's name comes from the current schema
+instead — hence `the schema now has Airport_fee`. Splitting the claim that way is
+why a mispaired rename in the source does not become a mispaired finding here;
+`vanished_fields()` also drops any departure whose field is still present, which
+removes the phantom half of the differ's output.
 
 ## 3. Two writes that are refused
 

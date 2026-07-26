@@ -42,8 +42,12 @@ step "6. The orphaned note: nothing to rewrite, so the fix is derived"
 # DataHub's own updateDescription cannot touch either case; it refuses a column
 # the schema does not have.
 ORPHAN=$(stilltrue findings | grep ORPHANED_DOC | sed 's/.*\[\([^]]*\)\].*/\1/')
-OTOKEN=$({ stilltrue apply "$ORPHAN" --server "$SERVER" 2>/dev/null || true; } \
-         | grep -o 'proposal_hash=[0-9a-f]*' | cut -d= -f2)
+# Shown, not swallowed: the dry run is the only place the derived proposal is
+# visible before it is confirmed, and it is what a reviewer is being asked to
+# read. Same `tee` as step 1 -- capturing it to grep the token silently would
+# make this the one refusal in the demo that never reaches the screen.
+ODRY=$({ stilltrue apply "$ORPHAN" --server "$SERVER" 2>&1 || true; } | tee /dev/stderr)
+OTOKEN=$(printf '%s' "$ODRY" | grep -o 'proposal_hash=[0-9a-f]*' | cut -d= -f2)
 stilltrue apply "$ORPHAN" --approve "$OTOKEN" --commit --server "$SERVER"
 
 step "7. Re-scan: the orphaned note is gone too"

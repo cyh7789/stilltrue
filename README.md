@@ -117,7 +117,7 @@ stilltrue findings
 
 Two worked examples, both unedited command output:
 [**tlc-rename**](examples/tlc-rename/) — detect, refuse two writes, approve, write
-back, verify. [**abstention**](examples/abstention/) — 25 real tables, 14 honest
+back, verify. [**abstention**](examples/abstention/) — 25 real tables, 29 honest
 "I don't know"s, zero false drift.
 
 If you would rather look than run:
