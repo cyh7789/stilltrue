@@ -63,7 +63,11 @@
 其中 b2 才是「DataHub 現成 Quality skill 能做到的部分」。實作把 DataHub 現成能力放在 B1，
 B2 換成「大小寫不敏感比對」。B2 對事件 1 依構造必然漏掉——但它不是造來輸的稻草人：
 那正是本專案第一版自己犯的 bug，回歸測試還留在 `tests/test_detectors.py`。
-**Originality 條款想要的 `b2_datahub_native` 對照目前沒有。**
+**`b2_datahub_native` 對照沒有做，但已測定「它做不出來」本身就是答案**（`NATIVE-COMPARISON.md`）：
+DataHub 開源版沒有任何原生能力讀描述內容並判斷是否成立——assertion 的七種型別
+（DATASET/FRESHNESS/VOLUME/SQL/FIELD/DATA_SCHEMA/CUSTOM）全都以資料為主體，沒有一種的主體是文件；
+`datahub-search` 自己的描述把 audit 定義為「how **complete** is our metadata」。
+硬做 b2 只會跟 B1 重複，或量到我們自己發明的東西。
 另：baseline 只跑在分母 2 的 TLC 上，dbt_shopify 的 40 正例／2,496 負例沒有 baseline 對照。
 
 ### 真實表誤報
@@ -103,7 +107,7 @@ read-back VERIFIED → 重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT�
 3. **D5 未接真實 LLM 判讀器，也未接進 CLI**。硬前提：`showcase-ecommerce` 的 `get_dataset_queries` 回傳 total 為 0，沒有輸入資料
 4. **內部 holdout（SPEC 三層資料的 B 層）** — 不存在。開發集只用了 `showcase-ecommerce`，`nyc-taxi` 與 `healthcare` 未使用
 5. **凍結程序與 `freeze.json`** — 不存在。SPEC 3.5 的凍結宣告已作廢
-6. **`b2_datahub_native` baseline** — 見 §3
+6. **`b2_datahub_native` baseline** — 已測定開源版無對應能力可對照，改以 `NATIVE-COMPARISON.md` 舉證，見 §3
 7. **SQLite State Store、排程器** — 不存在。現況是單發 CLI，不是「持續」執行
 8. **Steward Review UI** — 不存在。核准是 CLI 的 `--approve <hash>`，非圖形介面
 9. **程序級讀寫憑證分離未證實** — adapter 沒 import 寫入工具、executor 是獨立模組，但**沒有兩個程序、兩份憑證的實作**。SPEC §1 採 codex 架構的核心理由（唯一做到程序層級隔離）目前不成立

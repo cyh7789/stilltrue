@@ -20,11 +20,15 @@ This is not a taxi problem. DataHub's own writing names it precisely:
 > and AI tools that work in demos but fail in production.
 
 Everyone is busy pointing agents *at* the catalog. Nobody is checking whether
-what's in the catalog is still true. StillTrue is an agent whose
-job is the catalog itself: it reads what humans wrote, compares it against what
-the schema, lineage and query history actually do, and reports the places where
-the two have come apart — with citations, and never writing anything back without
-a human confirming that exact text.
+what's in the catalog is still true. DataHub's own framing of an audit is
+"[how complete is our metadata](docs/NATIVE-COMPARISON.md)" — and its seven
+assertion types are all about the data, none about the documentation. Complete,
+not correct.
+
+StillTrue is an agent whose job is the catalog itself: it reads what humans
+wrote, compares it against what the schema and lineage actually do, and reports
+where the two have come apart — with citations, and never writing anything back
+without a human confirming that exact text.
 
 ## What it does
 
@@ -216,10 +220,13 @@ regenerate with `python3 bench/run_bench.py`):
 | B2 — prose vs schema, case-insensitive | 0/2 | 0 | both |
 | **StillTrue** | **2/2** | **0** | — |
 
-**B1** is the honest one to beat: DataHub's documentation-coverage view already
-tells you which fields lack a description, and it finds the undocumented column.
-What it structurally cannot find is a description that is present and wrong,
-because it never reads the description.
+**B1** is the honest one to beat: it reimplements the strongest thing DataHub
+gives you for free — which fields lack a description — and it finds the
+undocumented column. What it structurally cannot find is a description that is
+present and wrong, because it never reads the description. (It *approximates*
+DataHub's completeness surface rather than reimplementing a specific feature
+line by line; the distinction is spelled out in
+[`docs/NATIVE-COMPARISON.md`](docs/NATIVE-COMPARISON.md).)
 
 **B2** is not a strawman. Lowercasing both sides is what most people write
 first, and it erases exactly the difference that constitutes a case-only rename.
@@ -236,7 +243,10 @@ with the mistake documented in the docstring.
   completeness. Nothing in the catalog means nothing to check.
 - **It does not rebuild what DataHub already ships.** DataHub Cloud's Context Hub
   has built-in evaluations for context quality; this is the open-source side of
-  the problem, and it does not attempt to replace that.
+  the problem, and it does not attempt to replace that. The full comparison —
+  what each DataHub skill declares it does, and why no assertion type can express
+  "this description is still true" — is in
+  [`docs/NATIVE-COMPARISON.md`](docs/NATIVE-COMPARISON.md).
 - **It never writes without approval.** There is no autonomous mode, no
   `--yes-to-all`. A write always requires a token for the exact text being
   written; see the support boundary below for what that token does not prove.
