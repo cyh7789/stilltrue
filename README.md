@@ -105,6 +105,12 @@ Two worked examples, both unedited command output:
 back, verify. [**abstention**](examples/abstention/) — 25 real tables, 14 honest
 "I don't know"s, zero false drift.
 
+If you would rather look than run:
+[**docs/L3-EVIDENCE.md**](docs/L3-EVIDENCE.md) walks one URN from the DataHub
+page that contradicts itself, through the two refused writes, to the same page
+after the correction — with the receipt, the audit chain, and DataHub's own
+change-log entry for the write.
+
 ## Design: the model proposes, the code decides
 
 ```

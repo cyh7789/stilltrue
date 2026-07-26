@@ -57,15 +57,23 @@ TLC 重播 2026-07-26 重跑過，涵蓋 TLC 已發布的全部 41 個月（2023
 ⚠️ 兩個誠實註記已寫進報告：holdout 只有 2 個正例（證明機制可轉移，不證明比率）；
 選源門檻仍用舊 oracle 評估，分母只有 2 就是這個不一致的顯影。
 
-## 三支上游 PR（全部 open、mergeable）
+## 四支上游 PR（全部 open）
 
 | PR | repo | 內容 |
 |---|---|---|
 | **#18622** | datahub | dataset 層描述解析（`resolve_description()`） |
 | **#18628** | datahub | 欄位層 editable 描述——Kit 抓了資料、刪掉、從沒合併。docstring 承諾的行為不存在 |
+| **#18630** | datahub | `list_schema_fields` 對沒有 schema 的 dataset 直接炸（`.get(k, {})` 遇到顯式 null）|
 | **#49** | datahub-skills | skill 改成變更帳本做法，含兩個踩過的坑 |
 
-CI 狀態未查、維護者尚未審。#18628 動的是 397 個測試依賴的共用檔，要盯 CI。
+#18630 是全機掃描時真的踩到的：`healthcare.main.patient_analytics` 掃不了。
+兩段式提交（測試紅 → 修綠），395 測試過。
+
+#18628 的 `python-lint` 曾紅過一次——我加的測試裡兩個 dict literal 超過 88 欄，
+`ruff format --check` 擋下來。已用 CI 釘的 `ruff==0.15.22` 重排推上去。
+**教訓：改上游前先裝它釘的 lint 版本跑一次，本地新版 ruff 的規則集不一樣。**
+
+維護者尚未審任何一支。
 
 ## 平台上的三個發現（提交敘事可用）
 
@@ -91,8 +99,12 @@ CI 狀態未查、維護者尚未審。#18628 動的是 397 個測試依賴的�
 
 **全部是把已有的東西變成評審看得到的**：
 
-- L3 可見證據：受影響 URN 清單 + DataHub UI 截圖／錄影
-- 影片（素材現成：`make demo` 的 NOT_APPROVED / STALE 兩顆鏡頭、`airport_fee` 由 DRIFT 轉 CURRENT）
+- ~~L3 可見證據~~ → `docs/L3-EVIDENCE.md` + `docs/evidence/*.png`，
+  截圖由 `scripts/capture_ui.py` 從 URN 產生，可重跑。
+  現在 TLC 那筆同時帶兩個偵測器的發現（schema break + orphaned doc），
+  孤兒描述是**真實改名造成的**，不是道具表。`orphan_probe*` 三張已刪。
+- 影片（素材現成：`make demo` 的 NOT_APPROVED / STALE 兩顆鏡頭、`airport_fee` 由 DRIFT 轉 CURRENT，
+  加上 L3-EVIDENCE 的四張前後對照）
 - repo 轉 public + About 區 Apache-2.0
 - Devpost 送件。**不要勾** Feedback Survey 獎（與其他獎互斥）
 
