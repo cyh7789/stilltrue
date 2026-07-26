@@ -179,13 +179,16 @@ similarly named replacement, now reads as abstention rather than drift.
 
 ## Evidence
 
-Two detectors, three corpora, one of them a frozen holdout scored once.
+Every number below is produced by ingesting into a real DataHub and reading back
+through the adapter. None of them is scored by handing the detector its own
+answer — which an earlier version of the orphaned-doc harness did, and which is
+described in full [below](#the-benchmark-that-could-not-fail).
 
-| | corpus | result | |
-|---|---|---|---|
-| **schema break** — the prose names a field that is gone | NYC TLC, 41 months of published schema history | **41/41** months exactly right, 0 false alarms | development |
-| **orphaned doc** — documentation attached to a field that is gone | `fivetran/dbt_hubspot` | **4/4**, 0 false alarms on 432 | development |
-| **orphaned doc** | **`fivetran/dbt_iterable`** | **2/2**, 0 false alarms on 199 | **frozen holdout, one run** |
+| | corpus | result |
+|---|---|---|
+| **schema break** — the prose names a field that is gone | NYC TLC, 41 months of published schema history | **41/41** months exactly right, 0 false alarms |
+| **orphaned doc** — documentation attached to a field that is gone | `fivetran/dbt_hubspot` | **4/4**, 0 false alarms on 432 |
+| **orphaned doc** | `fivetran/dbt_iterable` | **2/2**, 0 false alarms on 199 |
 
 ### The 41 months
 
@@ -201,18 +204,59 @@ and going quiet would be a failure. That is 41 consecutive decisions, not two.
 Labels come from diffing the TLC's own published files
 ([`bench/REPLAY-REPORT.md`](bench/REPLAY-REPORT.md)).
 
-### The holdout
+### The benchmark that could not fail
 
-`dbt_iterable` was fetched **after** the graded files were hashed, chosen by a
-rule committed before any candidate was inspected, and scored once. Sixteen
-repositories were rejected on the way, each with a mechanical reason.
-`python3 bench/freeze.py --check` re-derives the hashes and exits 1 on drift.
+The orphaned-doc numbers used to come from a harness that could not have
+produced any others, and the way that happened is worth more than the numbers.
 
-Two positives is a small denominator and
-[the report says so](bench/HOLDOUT-orphan-iterable.md): it establishes that the
-mechanism transfers, not a rate. The rarity is itself the finding — 4 orphans in
-one package, 2 in another. This failure is quiet rather than common, which is
-what you would expect of something no interface can display.
+The oracle called a case positive when a column left the model's SQL and its yml
+description outlived it. The scorer then handed the detector that column, that
+description and the after-schema. And the detector asserts when a documented
+field is absent from the schema. Three statements of one sentence — so labelling
+a row already settled the verdict. 2/2 and 0/199 were never at risk. Worse, that
+harness never imported `adapter.py`, so the part that actually fails in
+production — reading two different DataHub aspects and coming back with the right
+two sets, which is exactly where the Agent Context Kit drops field descriptions
+([datahub#18628](https://github.com/datahub-project/datahub/pull/18628)) — was
+never touched.
+
+`bench/run_orphan_bench_datahub.py` replays each model's history instead:
+ingest the columns as of the earlier commit, write the yml descriptions the way a
+person writes them (into `editableSchemaMetadata`, via the same Kit call the UI
+uses), ingest the later schema on top, then run the detector on whatever
+`ReadOnlyDataHubAdapter` reads back. The detector's inputs are now DataHub's
+answers, not the label's.
+
+It reports the same figures, which is exactly why it ships with the mutation that
+proves the difference:
+
+| | normal | `--mutate-skip-rewrite` |
+|---|---|---|
+| `run_orphan_bench_datahub.py` | 2/2 | **0/2** |
+| the old `run_orphan_bench.py` | 2/2 | 2/2 |
+
+Dropping the second ingestion means nothing gets orphaned, so a benchmark with
+any power has to go to zero. The new one does. The old one does not notice,
+because it never asks DataHub anything.
+
+One thing DataHub settled along the way: `updateDescription` refuses a column the
+schema does not have (`BAD_REQUEST`, *"Field X does not exist in the datasets
+schema"*). An orphaned description cannot be written directly — it can only be
+left behind, which is why this replay has to run in the order the events did.
+
+### Selection integrity, and one inconsistency
+
+`dbt_iterable` was fetched **after** the graded files were hashed, by a rule
+committed before any candidate was inspected, and scored once — sixteen
+repositories rejected on the way, each with a mechanical reason.
+`python3 bench/freeze.py --check` re-derives the hashes.
+
+Recorded rather than smoothed over: the rule's `mined_positives >= 30` threshold
+was evaluated with the *previous* oracle, which counted documentation edits
+rather than orphaned documentation. The denominator that actually turned up was
+2, not 30 ([the report](bench/HOLDOUT-orphan-iterable.md)). Two positives
+establish that the mechanism survives the round trip; they do not establish a
+rate.
 
 ### What was withdrawn, and why
 

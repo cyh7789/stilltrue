@@ -28,17 +28,33 @@
 
 ## 3. 實測數字
 
-| 偵測器 | 語料 | 結果 | 身分 |
-|---|---|---|---|
-| schema break | NYC TLC 41 個月真實發布歷史 | **41/41** 月精確正確、0 誤報 | 開發 benchmark |
-| orphaned doc | dbt_hubspot | **4/4**、432 負例 0 誤報 | 開發驗證 |
-| orphaned doc | **dbt_iterable** | **2/2**、199 負例 0 誤報 | **凍結 holdout，單跑** |
+全部走真的 DataHub：ingest 進去、用 adapter 讀回來再判定。
 
-凍結流程：選源規則先 commit → 受評 6 檔先 hash → 16 個候選機械淘汰 → 只跑一次。
+| 偵測器 | 語料 | 結果 |
+|---|---|---|
+| schema break | NYC TLC 41 個月真實發布歷史 | **41/41** 月精確正確、0 誤報 |
+| orphaned doc | dbt_hubspot | **4/4**、432 負例 0 誤報 |
+| orphaned doc | dbt_iterable | **2/2**、199 負例 0 誤報 |
+
+⚠️ **舊的 orphan benchmark 是套套邏輯，已被取代。** `run_orphan_bench.py` 把 label 裡的
+欄位、描述、後半段 schema 直接餵給偵測器，而偵測器的規則就是「有描述且欄位不在 schema」——
+跟 oracle 的正例定義同一句話。它也完全沒 import `adapter.py`，
+生產環境真正會壞的那層（從兩個 aspect 讀出正確集合，也就是 Kit 掉描述的地方）沒被測到。
+
+`run_orphan_bench_datahub.py` 改成重播進 DataHub 再用 adapter 讀回來。數字一樣，
+所以附突變開關讓人自己驗它會紅：
+
+| harness | 正常 | `--mutate-skip-rewrite` |
+|---|---|---|
+| `run_orphan_bench_datahub.py` | 2/2 | **0/2** |
+| 舊的 `run_orphan_bench.py` | 2/2 | 2/2 |
+
+⚠️ **dbt_iterable 對新 harness 不是盲 holdout。** 它是舊 harness 的盲 holdout；
+新 harness 是看過結果之後才寫的。撐住新數字的是突變測試，不是盲性。
+選源門檻另有一個不一致：用舊 oracle（算文件編輯數）評估，所以分母是 2 不是 30。
+
+凍結流程：選源規則先 commit → 受評檔先 hash → 16 個候選機械淘汰 → 只跑一次。
 `python3 bench/freeze.py --check` 可驗。
-
-⚠️ **兩個誠實註記**：holdout 只有 2 個正例，證明機制可轉移不證明比率；
-選源門檻仍用舊 oracle 評估（算文件編輯數），規則凍結在前所以照套，分母只有 2 就是這個不一致的顯影。
 
 **舊的三個 dbt 語料數字已撤下**：標籤量的是「描述後來被編輯」，
 `dbt_shopify` 10 筆正例裡 9 筆的被引用 token 在漂移窗兩端都不是該 model 的欄位。
