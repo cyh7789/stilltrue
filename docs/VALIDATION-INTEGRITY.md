@@ -61,6 +61,9 @@ The rule that produces the 9/10 was chosen because of the 9/10.
 
 ## What this means for each number
 
+(The table below covers the two development benchmarks. The frozen holdout added
+afterwards is a separate thing and is described at the end of this page.)
+
 | Source | Still true | No longer claimable |
 |---|---|---|
 | NYC TLC — 2/2, 0 FP | labels are the diff of two published TLC parquet schemas; anyone can regenerate them without running this project | that the system never saw the result before being finalised |
@@ -88,12 +91,23 @@ were chosen in the first place:
 What they cannot support is a generalisation claim. A benchmark that shaped the
 rules measures fit, not transfer.
 
-## The one thing that would restore it
+## What restored it, and what it cost
 
-A source acquired *after* a recorded freeze, scored once, with the code untouched
-afterwards regardless of outcome. That requires `freeze.json` pinning the hashes
-of the detectors, the category definitions and the scoring scripts, committed
-before the source is fetched. It has not been done yet; if it is, it will appear
-here with the freeze commit and the single scoring run.
+Done. `bench/freeze.json` pins the hashes of the detectors, the description
+resolver, the evidence record, the category definitions and the scoring script,
+committed at `f1661c0` — before any new source was fetched. The selection rule
+was committed one commit earlier still, so the choice of source cannot be an
+outcome of preferring one that scores well. `fivetran/dbt_fivetran_log` was
+scored once.
 
-Until then, this project reports benchmarks.
+**It scored 13/32 — 41% — against 90% on the development benchmark, with false
+positives rising from 4.5% to 9.6%.**
+
+That is what this page has been arguing all along, now with a number on it. The
+rule producing the 9/10 was chosen because of the 9/10; on a corpus it had never
+seen, the same rule finds under half. Both failure modes the holdout exposed are
+addressable and were deliberately left alone — a holdout that gets fixed until it
+agrees with the development set is a development set.
+
+`python3 bench/freeze.py --check` verifies the graded files have not moved since.
+Full result: [`bench/HOLDOUT-REPORT.md`](../bench/HOLDOUT-REPORT.md).

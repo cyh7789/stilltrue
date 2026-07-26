@@ -160,50 +160,54 @@ similarly named replacement, now reads as abstention rather than drift.
 
 ## Evidence
 
-Two third-party benchmarks, neither of them labelled by us:
+The number that matters is the one measured on a source this code had never
+seen, after its rules were frozen:
 
-| Benchmark | Tests | Result | Where the labels come from |
-|---|---|---|---|
-| NYC TLC trip records | docs vs data | **2/2**, 0 false positives | the diff between two published parquet schemas |
-| [`fivetran/dbt_shopify`](https://github.com/fivetran/dbt_shopify) | docs vs code | **9/10** on identifier changes, **4.5%** false positives on 1,933 negatives | the upstream project's own documentation-fix commits |
+| | Result |
+|---|---|
+| **Frozen holdout** — [`fivetran/dbt_fivetran_log`](https://github.com/fivetran/dbt_fivetran_log) | **13/32** identifier changes, 9.6% false positives |
 
-**These are benchmarks, not holdouts, and the difference matters.** Both were run
-during development and both changed the code: the TLC scan returning nothing is
-what surfaced the `editableProperties` bug, and a branch condition in
-`detectors.py` was set from the dbt_shopify score. A benchmark that shaped the
-rules measures fit, not transfer. The full timeline with commit hashes — including
-the frozen-holdout claim we withdrew — is in
+Everything else here is a development benchmark, and the difference is not
+cosmetic — on `dbt_shopify` the same detector scores **9/10**. Recall halved and
+false positives doubled when the corpus changed. The 90% was fitted; the 41% is
+the one to carry forward.
+
+| Development benchmark | Result | Where the labels come from |
+|---|---|---|
+| NYC TLC trip records | 2/2, 0 false positives | the diff between two published parquet schemas |
+| [`fivetran/dbt_shopify`](https://github.com/fivetran/dbt_shopify) | 9/10 identifier changes, 4.5% false positives on 1,933 negatives | the upstream project's own documentation-fix commits |
+
+**Both development benchmarks changed the code.** The TLC scan returning nothing
+is what surfaced the `editableProperties` bug; a branch in `detectors.py` was
+chosen because 9 of 10 dbt_shopify positives lived there. A benchmark that shaped
+the rules measures fit, not transfer, and the holdout is what puts a number on
+the difference. Timeline with commit hashes:
 [`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
 
-What survives the correction: the labels are still not ours, the denominators are
-still public, and the bad numbers are still reported — including the 4.5%, which
-was unmeasured until an external reviewer pointed out that publishing recall
-without precision states a claim nobody wrote down.
+### How the holdout was kept honest
 
-**The two false-positive numbers differ for a reason.** Zero on 25
-`showcase-ecommerce` tables, 4.5% on 1,933 dbt_shopify columns. The first corpus
-is table descriptions, where an unresolved token abstains; the second is *field*
-descriptions, where the detector asserts drift because on this data 9 of 10 real
-identifier changes live there. The cost is descriptions that enumerate values —
-`in_transit`, `fixed_amount`, `` `AND` `` — which look exactly like column names.
-Same rule, opposite face. Both numbers are in
-[`bench/SHOPIFY-REPORT.md`](bench/SHOPIFY-REPORT.md).
+Three things, each checkable rather than promised:
+
+1. **The selection rule was committed before any candidate was inspected**
+   (`f1661c0`): public `fivetran/dbt_*` repositories, alphabetical, first one
+   clearing fixed thresholds. Fifteen were rejected with a mechanical reason
+   each — the walk is in `bench/holdout-selection.json`.
+2. **The graded files were hashed before the source was fetched**
+   (`bench/freeze.json`). `python3 bench/freeze.py --check` re-derives them and
+   exits 1 on any drift.
+3. **The scorer was proven equivalent to the frozen one before it ran**, by
+   reproducing the frozen script's published numbers on the old data exactly.
+
+Scored once. Both failure modes it exposed — descriptions that enumerate values,
+and foreign-key prose naming a neighbouring table — are addressable and were
+left alone. A holdout that gets fixed until it agrees with the development set is
+a development set. Full analysis: [`bench/HOLDOUT-REPORT.md`](bench/HOLDOUT-REPORT.md).
 
 The dbt_shopify number is deliberately split by category
 ([`bench/SHOPIFY-REPORT.md`](bench/SHOPIFY-REPORT.md)). This detector compares
 identifiers named in prose against the schema, so it addresses identifier
-changes (9/10) and structurally cannot address deprecation notices — 17 of those
-30 positives name no identifier at all. Folding both into one denominator would
-understate the detector on the problem it solves and overstate it on the one it
-does not.
-
-The dbt_shopify miner walks 428 commits looking for pairs: a commit that changed
-a model's SQL without touching the matching description, and the later commit
-where a human finally fixed the wording. Everything between those two commits is
-drift, labelled by the maintainers' own behaviour rather than by us. Only the
-mechanically decidable categories (identifier changes, deprecation notices) count
-toward the headline numbers; see [`bench/oracles/MINING-REPORT.md`](bench/oracles/MINING-REPORT.md)
-for what was filtered out and why we stopped filtering.
+changes and structurally cannot address deprecation notices — 17 of those 30
+positives name no identifier at all.
 
 The TLC benchmark needs no human labelling at all: run `bench/oracles/scan_tlc.py`
 and the two events fall out of the published schemas.

@@ -29,7 +29,16 @@
 
 ## 3. 實測數字
 
-> ⚠️ 兩份第三方資料都是**開發期使用的 benchmark，不是 holdout**。
+### 凍結 holdout：fivetran/dbt_fivetran_log（唯一的轉移證據）
+
+- 選源規則先 commit（`f1661c0`）再看候選；15 個候選逐一淘汰、理由機械可查（`holdout-selection.json`）
+- 受評檔案先 hash（`freeze.json`）再取來源；`python3 bench/freeze.py --check` 可驗
+- 跑分器先證明與凍結那支等價（在 shopify 上重現 9/10 與 4.50%）再使用
+- **只跑一次**：IDENTIFIER_CHANGE **13/32（41%）**，負例誤報 **7/73（9.59%）**
+- 對照開發 benchmark 的 90% 與 4.50%：**recall 腰斬、誤報翻倍**。這就是擬合與轉移的差距
+- 暴露的兩類失敗（描述列舉值、外鍵散文指向鄰表）都可修，**刻意不修**——修到跟開發集一致就不是 holdout 了
+
+> ⚠️ 以下兩份第三方資料是**開發期使用的 benchmark，不是 holdout**。
 > 完整時序、哪個 commit 因跑分改了什麼、撤回了哪句宣告：[`VALIDATION-INTEGRITY.md`](VALIDATION-INTEGRITY.md)。
 
 ### 第三方 benchmark A：NYC TLC
@@ -106,7 +115,7 @@ read-back VERIFIED → 重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT�
 2. **D4 ownership 漂移** — 無程式碼
 3. **D5 未接真實 LLM 判讀器，也未接進 CLI**。硬前提：`showcase-ecommerce` 的 `get_dataset_queries` 回傳 total 為 0，沒有輸入資料
 4. **內部 holdout（SPEC 三層資料的 B 層）** — 不存在。開發集只用了 `showcase-ecommerce`，`nyc-taxi` 與 `healthcare` 未使用
-5. **凍結程序與 `freeze.json`** — 不存在。SPEC 3.5 的凍結宣告已作廢
+5. ~~**凍結程序與 `freeze.json`**~~ — **已完成**，見 §3。SPEC 3.5 的舊凍結宣告仍作廢（它宣稱的是兩份開發 benchmark）
 6. **`b2_datahub_native` baseline** — 已測定開源版無對應能力可對照，改以 `NATIVE-COMPARISON.md` 舉證，見 §3
 7. **SQLite State Store、排程器** — 不存在。現況是單發 CLI，不是「持續」執行
 8. **Steward Review UI** — 不存在。核准是 CLI 的 `--approve <hash>`，非圖形介面
