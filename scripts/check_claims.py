@@ -87,6 +87,47 @@ def check_video_script() -> None:
              f"shot {fastest[0]} at {fastest[1]:.0f}", "stated ceiling is too low")
 
 
+def check_retraction_table() -> None:
+    """The "Now" column of the retraction table must quote the live narration.
+
+    That table exists so a retracted sentence cannot come back. It went stale
+    twice while the narration moved on, which points the one artefact meant to
+    prevent regressions at the wrong target -- someone restoring "the fixed
+    version" would restore a sentence that was itself rejected.
+    """
+    doc = "docs/VIDEO-SCRIPT.md"
+    text = read(doc)
+    narration = " ".join(re.findall(r'\| "(.*?)" \(\d+w\) \|', text))
+    if not narration:
+        fail(doc, "a narration table", "no rows matched", "table format changed")
+        return
+
+    body = text.split("**Now fixed in the text above:**")
+    if len(body) < 2:
+        fail(doc, "a retraction table", "no match", "section heading changed")
+        return
+
+    lowered = narration.lower()
+    for row in body[1].splitlines():
+        cells = [c.strip() for c in row.split("|")]
+        if len(cells) < 5 or cells[1].startswith(("---", "Was")):
+            continue
+
+        # Take only the quoted span: a cell may carry prose after it ("… — the
+        # mechanism, not a person"), and a cell with no quote at all is "cut" or
+        # a pointer elsewhere. A trailing ellipsis marks an abbreviated citation,
+        # so the quote is matched as a prefix rather than in full -- these are
+        # citations of the narration, not copies of it.
+        m = re.match(r'"(.+?)"', cells[3])
+        if not m:
+            continue
+        quoted = m.group(1).rstrip("…").rstrip()
+        if quoted.lower() not in lowered:
+            fail(f"{doc} retraction table", quoted[:60],
+                 "not present in any narration cell",
+                 f"the Now column for {cells[1][:40]} quotes a line the script no longer says")
+
+
 def check_replay() -> None:
     """41/41 and the 1 + 1 + 39 breakdown against the per-month results."""
     rows = [json.loads(l) for l in read("bench/tlc-replay-results.jsonl").splitlines() if l.strip()]
@@ -196,7 +237,7 @@ def check_test_count() -> None:
 
 
 def main() -> None:
-    for check in (check_video_script, check_replay, check_orphan_corpora,
+    for check in (check_video_script, check_retraction_table, check_replay, check_orphan_corpora,
                   check_abstention_example, check_freeze_count, check_test_count):
         try:
             check()

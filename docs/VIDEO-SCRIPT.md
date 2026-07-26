@@ -104,14 +104,14 @@ month.
 
 | Was | Why it failed | Now |
 |---|---|---|
-| "a human confirmed it" (S2) | `scripts/demo.sh:26-32` extracts the token from the dry run and hands it to the commit — no human input anywhere in the shot. The token carries no identity (`proposal.py:99-114`) | "wrote only against a hash of the reviewed text" |
+| "a human confirmed it" (S2) | `scripts/demo.sh:26-32` extracts the token from the dry run and hands it to the commit — no human input anywhere in the shot. The token carries no identity (`proposal.py:99-114`) | "could not write until it was handed the hash of that exact proposal" |
 | "a coverage check scores this table perfectly" (S3) | the row on screen reads **1/2** (`bench/REPORT.md:22`) | "finds the undocumented column and misses the rename" |
 | "the description is written once" (S8) | `replay_tlc.py:83-96` upserts it every month; only the *column* docs are written once | "the same description is re-ingested every month and never corrected" |
-| "everything shown is in the repo" (S11) | shots 4–5, 7 and 9 are live terminals, shot 10 is a GitHub page, and the title card did not exist at review time | "every number here regenerates from the repo" |
+| "everything shown is in the repo" (S11) | shots 4–5, 7 and 9 are live terminals, shot 10 is a GitHub page, and the title card did not exist at review time | "every benchmark number here regenerates from the repo" |
 | "Nothing failed / every description kept running" (S1) | the oracle proves the schema changed; it checks no consumer at all, and a description does not run | cut |
 | "the one nobody is asking" (S3) | Cloud Context Hub evaluates context quality (`NATIVE-COMPARISON.md:131-146`) | cut; the narrow claim lives in the README |
 | "no entry, no claim" unqualified (S4) | true of `D1_SCHEMA_BREAK` only — the undocumented and orphaned detectors never read the change log | "for a broken reference…" |
-| "one DataHub cannot show you" (S7) | the next sentence says the aspect API returns it | "one no DataHub page will show you" |
+| "one DataHub cannot show you" (S7) | the next sentence says the aspect API returns it | "one no standard dataset page will show you" |
 | "someone documented `airport_fee`" (S7) | that note is a fixture written by `build_tlc_benchmark.py:76-96`, not a user's history | "document a column while `airport_fee` exists" — the mechanism, not a person |
 | "the same log the detector reads" (S6) | same timeline service, different category: the detector reads TECHNICAL_SCHEMA, the correction lands in DOCUMENTATION | "the same service the detector reads" |
 
