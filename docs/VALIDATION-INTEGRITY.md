@@ -93,21 +93,46 @@ rules measures fit, not transfer.
 
 ## What restored it, and what it cost
 
-Done. `bench/freeze.json` pins the hashes of the detectors, the description
-resolver, the evidence record, the category definitions and the scoring script,
-committed at `f1661c0` — before any new source was fetched. The selection rule
-was committed one commit earlier still, so the choice of source cannot be an
-outcome of preferring one that scores well. `fivetran/dbt_fivetran_log` was
-scored once.
+Two rounds, because the first one's answer was worth acting on.
 
-**It scored 13/32 — 41% — against 90% on the development benchmark, with false
-positives rising from 4.5% to 9.6%.**
+**Round 1.** `bench/freeze.json` pinned the hashes of the detector, the
+description resolver, the evidence record, the category definitions and the
+scoring script at `f1661c0` — before any new source was fetched. The selection
+rule was committed one commit earlier still, so the choice of source could not be
+an outcome of preferring one that scores well. `fivetran/dbt_fivetran_log` was
+scored once: **13/32 — 41%** against 90% on the development benchmark, with false
+positives at 9.59%.
 
-That is what this page has been arguing all along, now with a number on it. The
-rule producing the 9/10 was chosen because of the 9/10; on a corpus it had never
-seen, the same rule finds under half. Both failure modes the holdout exposed are
-addressable and were deliberately left alone — a holdout that gets fixed until it
-agrees with the development set is a development set.
+Publishing that unchanged was right and is not retracted. Refusing to *ever* fix
+what it found was not. A peer review put the missing number next to it: on the
+development benchmark the detector surfaced 9 true findings against 87 false ones
+— **9.4% precision**. A platform team receiving 96 alerts of which 87 are wrong
+turns the tool off. The freeze rule bars modifying the graded files *in response*
+— that is, re-grading the same source after a fix — not improving the product.
+
+**Round 2.** Both failure modes were fixed (`954415d`), `dbt_fivetran_log` was
+retired to a development benchmark, everything the first selection walk had mined
+was added to the exclusion list, and a second freeze drew `fivetran/dbt_hubspot`.
+Scored once: **4/12 — 33%**, false positives 13.78%.
+
+| | recall | false positives |
+|---|---|---|
+| dbt_shopify — development | 70% | 2.2% |
+| dbt_fivetran_log — holdout v1 | **41%** | 9.6% |
+| dbt_hubspot — holdout v2 | **33%** | 13.8% |
+
+**Two independently drawn holdouts agree.** One can be unlucky; two is a property
+of the tool. They are not a before/after of the fix — different sources and
+different code — so nothing here claims the fix raised recall.
+
+One correction the fix forced, worth stating because it cuts against us: the old
+9/10 was partly accidental. `shopify__discounts.value_type` and
+`.target_selection` scored as hits because the detector fired on `fixed_amount`,
+`percentage`, `all` and `entitled` — the enumerated values in their descriptions,
+not a broken reference. A label-based oracle credits a correct verdict reached for
+the wrong reason. The honest development figure was always nearer 7/10.
 
 `python3 bench/freeze.py --check` verifies the graded files have not moved since.
-Full result: [`bench/HOLDOUT-REPORT.md`](../bench/HOLDOUT-REPORT.md).
+It exited 1 when the round-1 fix landed, which is how round 2 began.
+Full results: [`bench/HOLDOUT-REPORT.md`](../bench/HOLDOUT-REPORT.md) and
+[`HOLDOUT-REPORT-v1.md`](../bench/HOLDOUT-REPORT-v1.md).

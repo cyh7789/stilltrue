@@ -29,14 +29,26 @@
 
 ## 3. 實測數字
 
-### 凍結 holdout：fivetran/dbt_fivetran_log（唯一的轉移證據）
+### 凍結 holdout ×2（轉移證據）
 
-- 選源規則先 commit（`f1661c0`）再看候選；15 個候選逐一淘汰、理由機械可查（`holdout-selection.json`）
-- 受評檔案先 hash（`freeze.json`）再取來源；`python3 bench/freeze.py --check` 可驗
-- 跑分器先證明與凍結那支等價（在 shopify 上重現 9/10 與 4.50%）再使用
-- **只跑一次**：IDENTIFIER_CHANGE **13/32（41%）**，負例誤報 **7/73（9.59%）**
-- 對照開發 benchmark 的 90% 與 4.50%：**recall 腰斬、誤報翻倍**。這就是擬合與轉移的差距
-- 暴露的兩類失敗（描述列舉值、外鍵散文指向鄰表）都可修，**刻意不修**——修到跟開發集一致就不是 holdout 了
+跑了兩輪。v1 暴露的兩類失敗修掉後，v1 來源就降為開發 benchmark，重新凍結再抽 v2。
+
+| 來源 | recall | 誤報 | 身分 |
+|---|---|---|---|
+| dbt_shopify | 7/10（70%） | 2.17% | 開發 benchmark |
+| **dbt_fivetran_log** | **13/32（41%）** | 9.59% | **凍結 holdout v1**（v1 程式碼） |
+| **dbt_hubspot** | **4/12（33%）** | 13.78% | **凍結 holdout v2**（v2 程式碼） |
+
+**兩個獨立 holdout 一致：野外 recall 是開發數字的三分之一到一半。** 一個可能是運氣，兩個是性質。
+
+流程（每步都可查）：選源規則先 commit → 受評檔案先 hash → 跑分器先證明與凍結版等價 → 單跑一次。
+`bench/freeze.py --check` 在 v1 修正落地時確實紅了，那是機制在work，也是 v2 這輪的起點。
+
+v2 的 58 筆誤報拆兩半（照登不重算）：50 筆是 `{{ doc("x") }}` dbt doc block，
+挖掘器沒解析模板所致（oracle 限制，檔案已凍結故不修）；8 筆（421 中 1.90%）是真的散文誤判——
+`Array of \`DEAL\` ids`，HubSpot 物件型別名。12 筆正例中 0 筆是 doc block，recall 不受影響。
+
+⚠️ 兩輪不是同一個修正的前後對照（來源不同、程式碼也不同），**不能宣稱修正提升了 recall**。
 
 > ⚠️ 以下兩份第三方資料是**開發期使用的 benchmark，不是 holdout**。
 > 完整時序、哪個 commit 因跑分改了什麼、撤回了哪句宣告：[`VALIDATION-INTEGRITY.md`](VALIDATION-INTEGRITY.md)。
@@ -54,8 +66,10 @@
 - 來源：428 commits 的 git 歷史（`bench/oracles/mine_drift_labels.py`）
 - 標籤：上游自己修文件的 commit 對
 - Tier A 40 筆（IDENTIFIER_CHANGE 10 + DEPRECATION 30），負例 2,496
-- 結果：**IDENTIFIER_CHANGE 9/10**；DEPRECATION 6/30，分開報告（30 筆中 17 筆的描述不含任何識別碼，該偵測器結構上不適用）
-- **誤報：1,933 筆可跑分負例中 87 筆誤判 DRIFT（4.50%）**。成因單一：描述列舉「值」而非欄位（`in_transit`、`fixed_amount`、反引號括的 `AND`/`OR`），落在欄位描述那條 medium-confidence 分支。此數字原本未量測，第二輪審查指出「只報 recall 不報 precision 等於宣稱了沒寫下來的東西」後補上
+- 結果：**IDENTIFIER_CHANGE 7/10**（修正前 9/10）；DEPRECATION 6/30，分開報告
+- **誤報：1,933 筆可跑分負例中 42 筆（2.17%）**，修正前 87 筆（4.50%）
+- **精確率 9.4% → 14.3%**（96 筆警報 9 筆真 → 49 筆警報 7 筆真）。這個數字是第三方諮詢算出來的，我原本只分開報 recall 與誤報率，從沒算過使用者實際會遇到的比例
+- ⚠️ **掉的 2 筆正例原本是靠運氣中的**：`shopify__discounts.value_type` 與 `.target_selection` 的舊命中來自打到 `fixed_amount`／`percentage`／`all` 這些列舉值，不是打到真的壞掉的引用。對標籤型 oracle 而言「因錯誤理由給出正確判定」也算命中，所以 9/10 有虛胖，誠實數字本來就接近 7
 - 已知失真：mart 模型用 `select *`，欄位無法從 SQL 原文重建
 - 誠信註記：`detectors.py` 的 field-description 分支條件是對著這份跑分結果調的（commit `0757ee3`，理由寫在原始碼註解裡）
 
