@@ -10,12 +10,19 @@ Supersedes `VIDEO-SCRIPT-a.md` and `-b.md`. The verdict that chose between them
 is `REVIEW-video-codex.md`; the reviews of this file are
 `REVIEW-video-final-codex.md` and `REVIEW-video-fixes-codex.md`.
 
-The first draft's per-shot counts were wrong in six of eleven rows, and its
-stated total of 440 was the sum of those wrong numbers — the real figure was 414
-words, with shots 1 and 3 at 225 and 210 wpm rather than the 275 and 225 an
-earlier version of this paragraph claimed. Its narration also carried claims this
-repo disproves: the second review listed eight formally, the third confirmed
-seven of the ten fixes, and the three that did not hold are rewritten below.
+The first draft's per-shot counts were wrong in **all eleven rows**: its header
+said 428 words, the labels summed to 440, and the narration actually ran 414,
+with shots 1 and 3 at 225 and 210 wpm. Every figure in this paragraph has been
+recomputed from `git show 8378707:docs/VIDEO-SCRIPT.md`, because earlier versions
+of it said "275 and 225 wpm", then "six of eleven rows" and "stated total of
+440" — each written from recollection of the editing session rather than from the
+file. That is the failure the narration kept making, committed inside the
+paragraph describing it. `make check-claims` now covers the live numbers; this
+one is history, so it is cited instead.
+
+The narration also carried claims this repo disproves: the second review listed
+eight formally, the third confirmed seven of the ten fixes, and the three that
+did not hold are rewritten below.
 
 Structure follows A: the problem and the result land in the first 21 seconds,
 because a judge may stop there and the brief says judges need not run anything.
