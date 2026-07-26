@@ -41,28 +41,36 @@ executor（寫前重讀／冪等／寫後回讀）、ledger（hash 鏈）、cli�
 
 ## 待辦
 
-**已完成（2026-07-26）**：凍結 + 凍結後 holdout 單跑、Originality 證據、D2 結案。
-
-1. ~~D2 新鮮度偵測~~ — **測定做不出來**，已結案（`docs/D2-FEASIBILITY.md`）。
-   76 張表 0 筆描述宣稱更新週期、`get_entities` 不回傳時間戳、assertion 全庫 0 筆、
-   `nyc-taxi` datapack 不在官方 registry。硬做等於自己寫題目自己改考卷。
-2. ~~凍結 + 新 holdout~~ — **已完成**。`dbt_fivetran_log` 13/32（41%），誤報 9.59%。
-   對照開發集的 90% / 4.50%：recall 腰斬、誤報翻倍。兩類失敗刻意不修。
-3. ~~Originality 證據~~ — **已完成**（`docs/NATIVE-COMPARISON.md`）。
+**已完成（2026-07-26）**：D2 結案、Originality 證據、凍結 holdout ×2、修兩類誤報、四類 agent 對位。
 
 **剩下唯一一件：提交消費面**（約 4 天，效益最大，也是最弱的一條）
 - 影片 2 天。素材現成：demo 的 NOT_APPROVED / STALE 兩顆鏡頭、`airport_fee` 由 DRIFT 轉 CURRENT
-- README 首屏已改成 holdout 41% 打頭；還缺 L3 可見證據（URN 清單 + DataHub UI 截圖）
+- L3 可見證據：URN 清單 + DataHub UI 截圖（唯一還沒產出的評審可見證物）
 - repo 轉 public + About 區 Apache-2.0 檢查
 - Devpost 送件。**不要勾** Feedback Survey 獎——與其他獎互斥
 
-⚠️ **凍結已生效**。再動 `detectors.py` / `adapter.py` / `evidence.py` /
-`mine_drift_labels.py` / `run_shopify_bench.py` 任一個，`bench/freeze.py --check` 就會紅，
-holdout 那 41% 的可信度跟著沒了。要改就得重跑整條凍結流程換新來源。
+⚠️ **凍結 v2 生效中**（commit `954415d`）。再動 `detectors.py` / `adapter.py` /
+`evidence.py` / `mine_drift_labels.py` / `run_shopify_bench.py` 任一個，
+`bench/freeze.py --check` 就會紅，v2 holdout 那 4/12 的可信度跟著沒。
+要改就得跑第三輪：修 → 重凍結 → 換新來源單跑（v1→v2 就是這樣走的，流程已驗證可重複）。
 
-## 四份審查（都在 repo 裡）
+## 兩個 holdout 的最終數字
 
-`docs/REVIEW-r1-{codex,duo}.md`、`docs/REVIEW-r2-{codex,duo}.md`。
+| 來源 | recall | 誤報 | 身分 |
+|---|---|---|---|
+| dbt_shopify | 7/10（70%） | 2.17% | 開發 benchmark |
+| dbt_fivetran_log | **13/32（41%）** | 9.59% | 凍結 holdout v1 |
+| dbt_hubspot | **4/12（33%）** | 13.78% | 凍結 holdout v2 |
+
+**兩個獨立 holdout 一致：野外 recall 是開發數字的三分之一到一半。**
+一個可能是運氣，兩個是性質。這是全案最強的一張牌——多數參賽作品只會報開發數字。
+
+## 六份外部意見（都在 repo 裡）
+
+審查四份：`docs/REVIEW-r1-{codex,duo}.md`、`docs/REVIEW-r2-{codex,duo}.md`。
+第二意見兩份：`docs/CONSULT-{fable,opus5}.md`——對三個已拍板決定的複核，
+Fable 推翻了「不修那兩類失敗」（凍結規則約束的是不因結果**重評同一來源**，不是不准改進產品），
+兩路都指出 README 首屏該讓方法打頭而非數字裸打頭。
 第二輪讓兩路各自複核自己第一輪的發現——`captured_at` 那個誤判就是由犯錯的那一路自己撤回的。
 
 ⚠️ **派 duo 的兩個前置條件**（踩過兩次才發現）：工作目錄必須是 git repo（`git init` + 一次 commit），
