@@ -29,10 +29,12 @@ ROOT = Path(__file__).resolve().parent.parent
 FREEZE_FILE = ROOT / "bench" / "freeze.json"
 
 FROZEN_FILES = [
-    "src/stilltrue/detectors.py",     # the rules themselves
-    "src/stilltrue/adapter.py",       # which text gets judged, and the change-log read
-    "src/stilltrue/evidence.py",      # what counts as a citation
-    "bench/oracles/replay_tlc.py",    # how a replay is scored
+    "src/stilltrue/detectors.py",          # the rules themselves
+    "src/stilltrue/adapter.py",            # which text gets judged, and the change-log read
+    "src/stilltrue/evidence.py",           # what counts as a citation
+    "bench/oracles/replay_tlc.py",         # how a replay is scored
+    "bench/oracles/mine_orphaned_docs.py", # what counts as orphaned documentation
+    "bench/run_orphan_bench.py",           # how orphan labels are scored
 ]
 
 # Written before any candidate repository was inspected. Mechanical on purpose:
@@ -43,7 +45,7 @@ SELECTION_RULE = {
         "dbt_shopify and any dbt_shopify_* variant -- already used as a development benchmark",
         "dbt_ad_reporting -- mined during the v1 selection walk, so its contents were seen",
         "dbt_amplitude, dbt_asana, dbt_facebook_ads -- same, mined during the v1 walk",
-        "dbt_fivetran_log -- the v1 holdout; its failures shaped the v2 code, so it is now a development benchmark",
+        "dbt_fivetran_log, dbt_hubspot -- scored under earlier designs and mined since",
         "repositories archived at selection time",
     ],
     "order": "alphabetical by repository name",
@@ -58,15 +60,15 @@ SELECTION_RULE = {
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
-    "round": 3,
+    "round": 4,
     "history": (
-        "Rounds 1 and 2 graded a detector that has since been replaced. It guessed which "
-        "tokens were field names and guessed renames by string similarity; the current one "
-        "asks DataHub's change log instead (ce3f819). Their sources -- dbt_fivetran_log and "
-        "dbt_hubspot -- are retained as records, not as evidence for this system: their "
-        "labels mark 'descriptions that were later edited', and in 9 of dbt_shopify's 10 "
+        "Rounds 1-3 graded detectors and oracles that have since been replaced. The old "
+        "oracle labelled 'descriptions that were later edited', which measures doc-editing "
+        "behaviour rather than what this system decides -- in 9 of dbt_shopify's 10 "
         "identifier-change positives the referenced token was never a column of that model "
-        "at either end of the window. Those labels do not measure what this detector does."
+        "at either end of the window. The current oracle labels a column that left the "
+        "model's SQL whose description outlived it, which git records without anyone "
+        "judging intent. Sources touched under any earlier round are excluded above."
     ),
 }
 

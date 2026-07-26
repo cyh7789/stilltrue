@@ -1,11 +1,13 @@
 {
-  "frozen_at": "2026-07-26T06:19:49+00:00",
-  "git_commit": "ce3bb6d03ae613228941d6a211852e976a5d669f",
+  "frozen_at": "2026-07-26T06:33:19+00:00",
+  "git_commit": "ca13e88b258b4a04279b908653270caa29c6650a",
   "files": {
-    "src/stilltrue/detectors.py": "d401411e9ebe84aff0e7f8552bc046f50120e2b76ceee61a8ac5ac9c8b0b7249",
-    "src/stilltrue/adapter.py": "4b0a915ebb8f89287c9c57695761ccb6dc758480d5821557d58dd01f6094d683",
+    "src/stilltrue/detectors.py": "59448b6a45d549783f85299142af1f6675c16d8c7672867ad4cf335f44e3bed0",
+    "src/stilltrue/adapter.py": "69bc329d4285de93dcbab3177635a18bc5551ec6685011788ed4a1ca92ac4dd6",
     "src/stilltrue/evidence.py": "b9c6e08597a95b9adf572fbd527a6be199341552ae156b24863c34d71f692d94",
-    "bench/oracles/replay_tlc.py": "6a4f8dcd0b8a791eed0633c1011c1527db12c9579185cfa1b78d8220a9135b45"
+    "bench/oracles/replay_tlc.py": "6a4f8dcd0b8a791eed0633c1011c1527db12c9579185cfa1b78d8220a9135b45",
+    "bench/oracles/mine_orphaned_docs.py": "993d6da763d0379556f5b0173196d40037926779c7b5336991039fcb596f167f",
+    "bench/run_orphan_bench.py": "8e5b5a7cb299e57f59b63f9c291d54eb07cd0996881807c108a51f295ad0079e"
   },
   "selection_rule": {
     "population": "public repositories under github.com/fivetran whose name starts with 'dbt_'",
@@ -13,7 +15,7 @@
       "dbt_shopify and any dbt_shopify_* variant -- already used as a development benchmark",
       "dbt_ad_reporting -- mined during the v1 selection walk, so its contents were seen",
       "dbt_amplitude, dbt_asana, dbt_facebook_ads -- same, mined during the v1 walk",
-      "dbt_fivetran_log -- the v1 holdout; its failures shaped the v2 code, so it is now a development benchmark",
+      "dbt_fivetran_log, dbt_hubspot -- scored under earlier designs and mined since",
       "repositories archived at selection time"
     ],
     "order": "alphabetical by repository name",
@@ -28,8 +30,8 @@
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
-    "round": 3,
-    "history": "Rounds 1 and 2 graded a detector that has since been replaced. It guessed which tokens were field names and guessed renames by string similarity; the current one asks DataHub's change log instead (ce3f819). Their sources -- dbt_fivetran_log and dbt_hubspot -- are retained as records, not as evidence for this system: their labels mark 'descriptions that were later edited', and in 9 of dbt_shopify's 10 identifier-change positives the referenced token was never a column of that model at either end of the window. Those labels do not measure what this detector does."
+    "round": 4,
+    "history": "Rounds 1-3 graded detectors and oracles that have since been replaced. The old oracle labelled 'descriptions that were later edited', which measures doc-editing behaviour rather than what this system decides -- in 9 of dbt_shopify's 10 identifier-change positives the referenced token was never a column of that model at either end of the window. The current oracle labels a column that left the model's SQL whose description outlived it, which git records without anyone judging intent. Sources touched under any earlier round are excluded above."
   },
   "note": "The NYC TLC replay is a development benchmark and is NOT covered by this freeze -- that data shaped this detector. See docs/VALIDATION-INTEGRITY.md."
 }

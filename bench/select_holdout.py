@@ -41,8 +41,9 @@ def candidates() -> list[dict]:
         repos += batch
     # Excluded by name because the v1 walk mined them, so their contents were
     # seen. A source this code has looked at cannot grade it.
-    seen = {"dbt_ad_reporting", "dbt_amplitude", "dbt_asana",
-            "dbt_facebook_ads", "dbt_fivetran_log"}
+    seen = {"dbt_ad_reporting", "dbt_amplitude", "dbt_asana", "dbt_facebook_ads",
+            "dbt_fivetran_log", "dbt_github", "dbt_google_ads", "dbt_greenhouse",
+            "dbt_hubspot"}
     out = [
         r for r in repos
         if r["name"].startswith("dbt_")
