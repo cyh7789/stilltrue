@@ -96,7 +96,7 @@ Confirmed (approved as a844edb7f3b94d57)
 VERIFIED: written and confirmed by read-back
 ```
 
-Receipt, from `runs/94b7e03ee841/audit-ledger.jsonl`:
+Receipt, from `docs/evidence/run-94b7e03ee841/audit-ledger.jsonl`:
 
 ```json
 {
@@ -117,6 +117,11 @@ Receipt, from `runs/94b7e03ee841/audit-ledger.jsonl`:
 `stilltrue verify --run 94b7e03ee841` → `OK: chain valid (10 records)`. Ten,
 because the refusals are in the chain too — a rejected write is a recorded
 event, not a silence.
+
+`runs/` is gitignored, so all three files of this run are committed under
+[`docs/evidence/run-94b7e03ee841/`](evidence/run-94b7e03ee841/) — findings,
+evidence and ledger. Every hash quoted on this page can be checked against them
+without a DataHub.
 
 ## 5. After — on the page
 
@@ -196,6 +201,36 @@ The precise claim, then, and it is narrower than "invisible": **DataHub's standa
 dataset pages do not render it, and an agent built on the Kit never receives it.**
 The aspect API returns it fine — the `curl` above is that route. `D1_ORPHANED_DOC`
 is what makes it visible to someone who is not already querying aspects by hand.
+
+### Fixing it produces no screenshot, and that is the proof
+
+`make demo` goes on to resolve this finding (steps 6 and 7): the write is refused
+without confirmation, the confirmed write reads back `VERIFIED`, and the rescan
+returns without it. Then the page looks like this:
+
+![after removing the orphan](evidence/04-after-columns.png)
+
+That is the same image as the one four sections up. Not a similar one — the same
+file. The schema still shows `Airport_fee`, the documentation still says
+`Airport_fee`, and nothing else moved, because the thing that was removed was
+never on the page to begin with.
+
+So the before/after for this fix has to be the aspect:
+
+```bash
+curl -s -u datahub:datahub \
+  "http://localhost:8080/aspects/${URN}?aspect=editableSchemaMetadata&version=0"
+```
+
+| | `editableSchemaFieldInfo` |
+|---|---|
+| before | `['airport_fee']` — keyed to a column the schema has not had since 2023-02 |
+| after | `[]` |
+
+A judge who only watches the screen cannot tell this happened. That is the honest
+shape of the finding: a fault with no rendering has a fix with no rendering, and
+the aspect is where both live. It is also why `stilltrue apply` takes no `--to`
+here — there is no corrected text a person could have typed.
 
 ---
 
