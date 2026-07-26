@@ -93,6 +93,21 @@ is the field-level twin of the dataset-level bug fixed in
 [`datahub#18622`](https://github.com/datahub-project/datahub/pull/18622); the
 same fix is needed one level down.
 
+### Documentation nothing can display
+
+When a pipeline stops producing a column, DataHub rewrites `schemaMetadata` and
+leaves `editableSchemaMetadata` alone. Any description a human wrote for that
+column through the UI stays behind, keyed to a field that no longer exists.
+
+DataHub does not clean it up. The UI cannot show it — there is no column left to
+render it on. And the Agent Context Kit drops the aspect entirely, so no agent
+can read it either. It is documentation that exists in the graph and is
+invisible from every interface, while still being handed to anything that reads
+the catalog through the API.
+
+Verified end to end: ingest three columns, document two through the API,
+re-ingest without one. Its description is still there afterwards.
+
 ## Assertions cannot express it
 
 DataHub models data quality as typed assertions. The Agent Context Kit exposes

@@ -53,12 +53,13 @@ those shapes one by one is an open-world problem. Requiring evidence closes it �
 an enumerated value never appears in a schema change log, so no rule had to be
 written to exclude it.
 
-Four checks across three families, only one of which is allowed near a language
+Five checks across three families, only one of which is allowed near a language
 model:
 
 | | What the humans wrote | What reality shows | How it's decided |
 |---|---|---|---|
-| **D1** schema break | a description references a field | the field list | deterministic |
+| **D1** schema break | a description references a field | DataHub's change log | deterministic |
+| **D1** orphaned doc | a field is documented | the field is not in the schema | deterministic |
 | **D1** undocumented | table is documented | some fields aren't | deterministic |
 | **D3** lineage drift | "derived from X" | actual upstreams | deterministic |
 | **D5** semantic conflict | one glossary term, two definitions | how each side filters in real queries | prefilter → LLM → citation gate |
@@ -172,41 +173,52 @@ similarly named replacement, now reads as abstention rather than drift.
 
 ## Evidence
 
-27 months of NYC TLC schema history, replayed as it was actually published.
+Two detectors, three corpora, one of them a frozen holdout scored once.
 
-A description is written once against the January 2023 schema and never revised.
-Every month's real parquet schema is then ingested in order — the ordinary
+| | corpus | result | |
+|---|---|---|---|
+| **schema break** — the prose names a field that is gone | NYC TLC, 27 months of published schema history | **27/27** months exactly right, 0 false alarms | development |
+| **orphaned doc** — documentation attached to a field that is gone | `fivetran/dbt_hubspot` | **4/4**, 0 false alarms on 432 | development |
+| **orphaned doc** | **`fivetran/dbt_iterable`** | **2/2**, 0 false alarms on 199 | **frozen holdout, one run** |
+
+### The 27 months
+
+A description written once against the January 2023 schema and never revised,
+then every month's real TLC parquet schema ingested in order — the ordinary
 situation, where the pipeline keeps running and the docs do not keep up. Two
-things happened in those months and neither was announced: `airport_fee` became
-`Airport_fee` in 2023-02, and `cbd_congestion_fee` appeared in 2025-01.
+things happened and neither was announced: `airport_fee` became `Airport_fee` in
+2023-02, `cbd_congestion_fee` appeared in 2025-01.
 
-| | |
-|---|---|
-| Months scored exactly right | **27/27** |
-| Drift caught in the month it happened | **2/2** |
-| False alarms | **0** |
-
-Scored on *state*, not events: the rename was never corrected, so the right
-answer is to report it in 2023-02 **and every month after**. Reporting it once
+Scored on *state*, not events. The rename was never corrected, so the right
+answer is to report it in 2023-02 **and every month after**; reporting it once
 and going quiet would be a failure. That is 27 consecutive decisions, not two.
-Labels come from diffing the TLC's own published parquet files
+Labels come from diffing the TLC's own published files
 ([`bench/REPLAY-REPORT.md`](bench/REPLAY-REPORT.md)).
 
-This is a development benchmark and says so — the TLC data shaped this detector.
-What it establishes is that the mechanism works end to end on real schema
-history, which no snapshot score can.
+### The holdout
 
-### Why there are no dbt package numbers here any more
+`dbt_iterable` was fetched **after** the graded files were hashed, chosen by a
+rule committed before any candidate was inspected, and scored once. Sixteen
+repositories were rejected on the way, each with a mechanical reason.
+`python3 bench/freeze.py --check` re-derives the hashes and exits 1 on drift.
 
-Three dbt packages were scored under the previous design. Their numbers are gone
-because the labels turned out not to measure this, and the finding is worth more
-than the numbers were: in **9 of `dbt_shopify`'s 10** identifier-change
-positives, the referenced token was never a column of that model at either end
-of the drift window. They are enumerated values (`fixed_amount`, `percentage`)
-and upstream model names. The old detector scored them by firing on exactly those
-tokens — and a label-based oracle credits a correct verdict reached for the wrong
-reason. The corpora stay in the repo with that recorded; they are not headline
-evidence. Full history, including a frozen-holdout claim drafted and withdrawn:
+Two positives is a small denominator and
+[the report says so](bench/HOLDOUT-orphan-iterable.md): it establishes that the
+mechanism transfers, not a rate. The rarity is itself the finding — 4 orphans in
+one package, 2 in another. This failure is quiet rather than common, which is
+what you would expect of something no interface can display.
+
+### What was withdrawn, and why
+
+Three dbt packages were scored under a previous design and those numbers are
+gone. The labels measured "descriptions that were later edited", which is
+doc-editing behaviour rather than what this system decides: in **9 of
+`dbt_shopify`'s 10** identifier-change positives the referenced token was never
+a column of that model at either end of the window — enumerated values like
+`fixed_amount`, and upstream model names. The old detector scored them by firing
+on exactly those tokens, and a label-based oracle credits a correct verdict
+reached for the wrong reason. Fixing the oracle is what exposed the orphaned-doc
+gap. Full history, including a frozen-holdout claim drafted and withdrawn:
 [`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
 
 ### Does this actually need a context platform?
