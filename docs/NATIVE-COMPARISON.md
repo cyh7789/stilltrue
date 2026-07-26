@@ -56,6 +56,43 @@ The Data Quality Agent is the one most likely to be mistaken for this, and the
 distinction is one word: its assertions take **data** as their subject. Which
 brings us to why that is not a naming accident.
 
+## The capability DataHub documents but no agent can reach
+
+DataHub computes a semantic diff between successive versions of a schema and
+serves it as a change log:
+
+```
+$ datahub timeline --urn "<URN>" --category technical_schema
+  TECHNICAL_SCHEMA REMOVE airport_fee
+    "A backwards incompatible change due to removal of field: 'airport_fee'."
+```
+
+Nine categories: `tag`, `glossary_term`, `technical_schema`, `documentation`,
+`ownership`, `domain`, `structured_property`, `application`, `asset_membership`.
+It is documented in the skills repo's **own** agent-facing CLI reference
+(`shared-references/datahub-cli-reference.md`).
+
+**No skill uses it, and the Agent Context Kit exposes no tool for it.** Zero
+mentions across all five shipped skills; nothing in the Kit's thirty-eight
+exported symbols. StillTrue reads it over REST because that is the only way an
+agent can.
+
+That is the sharpest form of the gap on this page: the platform already knows
+what changed, and the agent surface cannot ask.
+
+### A second thing the agent surface cannot see
+
+`list_schema_fields` returns no field descriptions. Its GraphQL asks for
+`editableSchemaMetadata.editableSchemaFieldInfo.description`; the Python that
+assembles the reply reads only `schemaMetadata.fields`. Measured on a dataset
+with 19 of 20 fields documented, the Kit returns **0** — while the tool's own
+docstring advertises matching on `description`.
+
+So an agent built on the Kit cannot audit field-level documentation at all. This
+is the field-level twin of the dataset-level bug fixed in
+[`datahub#18622`](https://github.com/datahub-project/datahub/pull/18622); the
+same fix is needed one level down.
+
 ## Assertions cannot express it
 
 DataHub models data quality as typed assertions. The Agent Context Kit exposes

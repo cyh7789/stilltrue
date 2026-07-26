@@ -41,6 +41,18 @@ stilltrue apply <id> --to "…" \
 stilltrue verify                # prove the audit trail wasn't tampered with
 ```
 
+How a claim gets made: **the detector never decides whether a token looks like a
+field name.** It asks DataHub what changed. An assertion needs evidence the token
+*was* a field here — a near-match in the current schema (renamed), or a departure
+in DataHub's change log (deleted). Everything else abstains.
+
+That is why this module has no list of English phrases in it. Descriptions
+enumerate values, name neighbouring tables, cite entity types and carry
+unexpanded Jinja; every corpus writes a form the last one did not. Subtracting
+those shapes one by one is an open-world problem. Requiring evidence closes it —
+an enumerated value never appears in a schema change log, so no rule had to be
+written to exclude it.
+
 Four checks across three families, only one of which is allowed near a language
 model:
 
@@ -160,52 +172,42 @@ similarly named replacement, now reads as abstention rather than drift.
 
 ## Evidence
 
-Most submissions report the number their tool scores on the data they built it
-with. This one reports what happened when it met two corpora it had never seen,
-after its rules were hashed and locked.
+27 months of NYC TLC schema history, replayed as it was actually published.
 
-| | recall | false positives | |
-|---|---|---|---|
-| `dbt_shopify` | 70% | 2.2% | development benchmark — shaped the rules |
-| **`dbt_fivetran_log`** | **41%** | 9.6% | **frozen holdout v1**, scored once |
-| **`dbt_hubspot`** | **33%** | 13.8% | **frozen holdout v2**, scored once |
+A description is written once against the January 2023 schema and never revised.
+Every month's real parquet schema is then ingested in order — the ordinary
+situation, where the pipeline keeps running and the docs do not keep up. Two
+things happened in those months and neither was announced: `airport_fee` became
+`Airport_fee` in 2023-02, and `cbd_congestion_fee` appeared in 2025-01.
 
-**Two independent holdouts agree: in the field this finds a third to a half of
-what the development number suggests.** One holdout can be unlucky; two is a
-property of the tool. Both numbers are published unchanged — v1's failures were
-fixed and v1 was then retired to a development benchmark, which is why v2 exists
-and why v2 was drawn from a fresh freeze.
+| | |
+|---|---|
+| Months scored exactly right | **27/27** |
+| Drift caught in the month it happened | **2/2** |
+| False alarms | **0** |
 
-NYC TLC is the third development benchmark: 2/2 with zero false positives on the
-two real drift events in 35 months of published schemas
-([`bench/REPORT.md`](bench/REPORT.md)).
+Scored on *state*, not events: the rename was never corrected, so the right
+answer is to report it in 2023-02 **and every month after**. Reporting it once
+and going quiet would be a failure. That is 27 consecutive decisions, not two.
+Labels come from diffing the TLC's own published parquet files
+([`bench/REPLAY-REPORT.md`](bench/REPLAY-REPORT.md)).
 
-### Why you can check that rather than take our word
+This is a development benchmark and says so — the TLC data shaped this detector.
+What it establishes is that the mechanism works end to end on real schema
+history, which no snapshot score can.
 
-1. **The selection rule was committed before any candidate was inspected.**
-   Public `fivetran/dbt_*` repos, alphabetical, first clearing six fixed
-   thresholds. Seventeen were rejected in the v2 walk with a mechanical reason
-   each ([`bench/holdout-selection.json`](bench/holdout-selection.json)).
-2. **The graded files were hashed before the source was fetched.**
-   `python3 bench/freeze.py --check` re-derives them and exits 1 on drift — it
-   did exactly that when the v1 fix landed, which is how the v2 round started.
-3. **The scorer was proven equivalent to the frozen one before it ran**, by
-   reproducing the frozen script's published numbers on the old data exactly.
-4. **Every round is on the record**, including the frozen-holdout claim we
-   drafted and withdrew: [`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
+### Why there are no dbt package numbers here any more
 
-The pattern across three corpora is the finding: **each one writes prose the last
-one did not.** Enumerated values, foreign-key references, dbt doc blocks,
-uppercase entity types — every round has turned up a fresh way for a description
-to name something that is not a column. Full analyses in
-[`bench/HOLDOUT-REPORT.md`](bench/HOLDOUT-REPORT.md) and
-[`HOLDOUT-REPORT-v1.md`](bench/HOLDOUT-REPORT-v1.md).
-
-The dbt_shopify number is split by category
-([`bench/SHOPIFY-REPORT.md`](bench/SHOPIFY-REPORT.md)): this detector compares
-identifiers named in prose against the schema, so it addresses identifier changes
-and structurally cannot address deprecation notices — 17 of those 30 positives
-name no identifier at all.
+Three dbt packages were scored under the previous design. Their numbers are gone
+because the labels turned out not to measure this, and the finding is worth more
+than the numbers were: in **9 of `dbt_shopify`'s 10** identifier-change
+positives, the referenced token was never a column of that model at either end
+of the drift window. They are enumerated values (`fixed_amount`, `percentage`)
+and upstream model names. The old detector scored them by firing on exactly those
+tokens — and a label-based oracle credits a correct verdict reached for the wrong
+reason. The corpora stay in the repo with that recorded; they are not headline
+evidence. Full history, including a frozen-holdout claim drafted and withdrawn:
+[`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
 
 ### Does this actually need a context platform?
 

@@ -29,74 +29,31 @@
 
 ## 3. 實測數字
 
-### 凍結 holdout ×2（轉移證據）
+### 主要 benchmark：NYC TLC 27 個月真實發布歷史重播
 
-跑了兩輪。v1 暴露的兩類失敗修掉後，v1 來源就降為開發 benchmark，重新凍結再抽 v2。
+描述寫一次（對著 2023-01 的 schema），之後不再改；每個月的真實 parquet schema 依序 ingest。
 
-| 來源 | recall | 誤報 | 身分 |
-|---|---|---|---|
-| dbt_shopify | 7/10（70%） | 2.17% | 開發 benchmark |
-| **dbt_fivetran_log** | **13/32（41%）** | 9.59% | **凍結 holdout v1**（v1 程式碼） |
-| **dbt_hubspot** | **4/12（33%）** | 13.78% | **凍結 holdout v2**（v2 程式碼） |
+| | |
+|---|---|
+| 精確正確的月份 | **27/27** |
+| 漂移在發生當月抓到 | **2/2** |
+| 誤報 | **0** |
 
-**兩個獨立 holdout 一致：野外 recall 是開發數字的三分之一到一半。** 一個可能是運氣，兩個是性質。
+以**狀態**計分不是事件：改名後描述從沒修過，所以正確答案是 2023-02 **與其後每個月**都要報。
+報一次就安靜是失敗。這是 27 個連續判斷不是 2 個。標籤來自 TLC 自己發布的 parquet 差集。
+細節：`bench/REPLAY-REPORT.md`。
 
-流程（每步都可查）：選源規則先 commit → 受評檔案先 hash → 跑分器先證明與凍結版等價 → 單跑一次。
-`bench/freeze.py --check` 在 v1 修正落地時確實紅了，那是機制在work，也是 v2 這輪的起點。
+⚠️ 這是**開發 benchmark**。TLC 資料塑造過這個偵測器。它證明的是機制在真實 schema 歷史上
+端到端可運作，不是泛化宣告。
 
-v2 的 58 筆誤報拆兩半（照登不重算）：50 筆是 `{{ doc("x") }}` dbt doc block，
-挖掘器沒解析模板所致（oracle 限制，檔案已凍結故不修）；8 筆（421 中 1.90%）是真的散文誤判——
-`Array of \`DEAL\` ids`，HubSpot 物件型別名。12 筆正例中 0 筆是 doc block，recall 不受影響。
+### 三個 dbt 語料為何不再是主要證據
 
-⚠️ 兩輪不是同一個修正的前後對照（來源不同、程式碼也不同），**不能宣稱修正提升了 recall**。
+舊設計下跑過 dbt_shopify / dbt_fivetran_log / dbt_hubspot。數字撤下，因為**標籤量的不是這件事**：
+`dbt_shopify` 的 10 筆 IDENTIFIER_CHANGE 正例裡，**9 筆的被引用 token 在漂移窗兩端都不是該
+model 的欄位**——是列舉值（`fixed_amount`、`percentage`）與上游 model 名。舊偵測器正是打到
+那些 token 才算命中，而標籤型 oracle 對「因錯誤理由給出正確判定」也記一分。
 
-> ⚠️ 以下兩份第三方資料是**開發期使用的 benchmark，不是 holdout**。
-> 完整時序、哪個 commit 因跑分改了什麼、撤回了哪句宣告：[`VALIDATION-INTEGRITY.md`](VALIDATION-INTEGRITY.md)。
-
-### 第三方 benchmark A：NYC TLC
-
-- 來源：TLC 官方公開 parquet，35 個月全掃描（`bench/oracles/scan_tlc.py`）
-- 標籤：兩份已發布 schema 的差集，非人工標註
-- 事件：2023-02 `airport_fee` → `Airport_fee`；2025-01 新增 `cbd_congestion_fee`
-- 結果：**2/2 偵測，0 誤報**（同一次掃描另記 5 筆 CURRENT）
-- 誠信註記：`authored_description()` 因這條掃描回 0 findings 才加（commit `457b190`）
-
-### 第三方 benchmark B：fivetran/dbt_shopify
-
-- 來源：428 commits 的 git 歷史（`bench/oracles/mine_drift_labels.py`）
-- 標籤：上游自己修文件的 commit 對
-- Tier A 40 筆（IDENTIFIER_CHANGE 10 + DEPRECATION 30），負例 2,496
-- 結果：**IDENTIFIER_CHANGE 7/10**（修正前 9/10）；DEPRECATION 6/30，分開報告
-- **誤報：1,933 筆可跑分負例中 42 筆（2.17%）**，修正前 87 筆（4.50%）
-- **精確率 9.4% → 14.3%**（96 筆警報 9 筆真 → 49 筆警報 7 筆真）。這個數字是第三方諮詢算出來的，我原本只分開報 recall 與誤報率，從沒算過使用者實際會遇到的比例
-- ⚠️ **掉的 2 筆正例原本是靠運氣中的**：`shopify__discounts.value_type` 與 `.target_selection` 的舊命中來自打到 `fixed_amount`／`percentage`／`all` 這些列舉值，不是打到真的壞掉的引用。對標籤型 oracle 而言「因錯誤理由給出正確判定」也算命中，所以 9/10 有虛胖，誠實數字本來就接近 7
-- 已知失真：mart 模型用 `select *`，欄位無法從 SQL 原文重建
-- 誠信註記：`detectors.py` 的 field-description 分支條件是對著這份跑分結果調的（commit `0757ee3`，理由寫在原始碼註解裡）
-
-### Baseline 對照（同一 benchmark、同一輸入）
-
-| Baseline | Recall | 誤報 |
-|---|---|---|
-| B0 無 context（只有描述文字） | 0/2 | 0 |
-| B1 只看覆蓋率（DataHub 現成能力） | 1/2 | 0 |
-| B2 描述 vs schema，大小寫不敏感 | 0/2 | 0 |
-| 本作 | 2/2 | 0 |
-
-⚠️ 與 SPEC 3.4 的偏離：SPEC 定的是 `b0_nocontext` / `b1_rules` / `b2_datahub_native`，
-其中 b2 才是「DataHub 現成 Quality skill 能做到的部分」。實作把 DataHub 現成能力放在 B1，
-B2 換成「大小寫不敏感比對」。B2 對事件 1 依構造必然漏掉——但它不是造來輸的稻草人：
-那正是本專案第一版自己犯的 bug，回歸測試還留在 `tests/test_detectors.py`。
-**`b2_datahub_native` 對照沒有做，但已測定「它做不出來」本身就是答案**（`NATIVE-COMPARISON.md`）：
-DataHub 開源版沒有任何原生能力讀描述內容並判斷是否成立——assertion 的七種型別
-（DATASET/FRESHNESS/VOLUME/SQL/FIELD/DATA_SCHEMA/CUSTOM）全都以資料為主體，沒有一種的主體是文件；
-`datahub-search` 自己的描述把 audit 定義為「how **complete** is our metadata」。
-硬做 b2 只會跟 B1 重複，或量到我們自己發明的東西。
-另：baseline 只跑在分母 2 的 TLC 上，dbt_shopify 的 40 正例／2,496 負例沒有 baseline 對照。
-
-### 真實表誤報
-
-`showcase-ecommerce` 25 張表：schema-break 誤報 0（收緊規則前為 6），14 筆棄權，3 筆 D1_UNDOCUMENTED。
-未編輯輸出：`examples/abstention/`。
+語料與該發現都留在 repo，但不再是頭條證據。
 
 ## 4. 端到端閉環（已實際執行，非 dry-run）
 
