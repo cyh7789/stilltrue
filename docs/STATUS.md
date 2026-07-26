@@ -17,43 +17,31 @@
 
 | 模組 | 內容 |
 |---|---|
-| `src/stilltrue/adapter.py` | 唯讀 adapter，包 Agent Context Kit 的 5 個讀取工具（get_entities、list_schema_fields、get_lineage、get_dataset_queries、grep_documents）。**Kit 另有 `search`、`search_documents` 未包**——掃描範圍由 URN 清單或 `--limit` 決定，偵測路徑不需要搜尋。寫入工具未 import。含 `authored_description()`：editableProperties 優先、fallback properties |
-| `src/stilltrue/evidence.py` | 證據紀錄。欄位：`entity_urn`、`source_function`、`captured_at`、`payload_hash`、`payload`。**`evidence_id` 由「URN + function + payload」內容決定，不含 `captured_at`**——重跑同一觀測產生同一 id，既有引用不會失效；但擷取時間本身有存在紀錄裡（`evidence.py:47` 與 `to_dict()`）。`EvidenceStore` 支援跨命令 hydrate |
-| `src/stilltrue/detectors.py` | D1 schema 斷鏈、D1 未文件化欄位、D3 lineage 漂移。全確定性，無 LLM。三態 verdict **皆會產出**：引用解析成功記 CURRENT、有改名候選記 DRIFT、無候選且來自表描述記 INSUFFICIENT_EVIDENCE |
-| `src/stilltrue/semantic.py` | D5 語意漂移。確定性預篩 → 注入式判讀器 → 引文閘。模組本身不發網路請求。**未接真實 LLM，未接進 CLI** |
-| `src/stilltrue/proposal.py` | Proposal + PolicyGate + `check_approval()`。Gate 擋六類：白名單外 aspect、非 DRIFT verdict、無證據、引用不存在證據、前後相同、清空內容。確認另有一關：`--approve <proposal_hash>`。hash 的 canonical payload 為 `{urn, aspect, subject, before, after, verdict, evidence}` 七項全覆蓋，改任一項即 STALE。**這是內容鎖，不是授權邊界**：不帶身分、不帶簽章，能跑 `apply` 的人自己 dry-run 就拿得到 token |
-| `src/stilltrue/executor.py` | 寫前重讀（TOCTOU）、冪等鍵、寫後回讀。VERIFY_FAILED 不自動重試 |
-| `src/stilltrue/ledger.py` | append-only JSONL，hash 鏈。verify 可抓內容竄改、刪除、順序調換。**被拒絕的嘗試也入鏈**（NOT_APPROVED / STALE） |
-| `src/stilltrue/cli.py` | `stilltrue scan / findings / apply / verify` |
-| `Makefile` + `scripts/demo.sh` | `make demo`（全閉環含兩次自動拒寫，可重跑）、`make bench-replay`、`make datahub-up`、`make test` |
+| `adapter.py` | 唯讀 adapter。Kit 的 5 個讀取工具 + 兩個 Kit 拿不到的：`schema_changes()` 讀 DataHub timeline（Kit 無此工具）、`authored_field_descriptions()` 讀 editable 欄位描述（Kit 會丟掉，見上游 PR #18628）。寫入工具未 import |
+| `evidence.py` | 證據紀錄，內容定址 id，含 `captured_at` |
+| `detectors.py` | **全部改為證據閘門，零英文詞組清單**。`vanished_fields()` 讀 DataHub 變更帳本並用現況 schema 過濾掉位置比對造成的假改名；`detect_schema_break()` 只在有改名候選或帳本記錄離開時斷言；`detect_orphaned_docs()` 比對 editable 描述與現況 schema；`detect_lineage_drift()` |
+| `semantic.py` | D5，未接真實 LLM 也未接 CLI（`get_dataset_queries` 全庫回 0） |
+| `proposal.py` | Proposal + PolicyGate + `check_approval()`（內容鎖，非授權邊界） |
+| `executor.py` | 寫前重讀、冪等鍵、寫後回讀 |
+| `ledger.py` | hash 鏈，拒絕事件也入鏈 |
+| `cli.py` | `stilltrue scan / findings / apply / verify` |
 
 ## 3. 實測數字
 
-### 主要 benchmark：NYC TLC 27 個月真實發布歷史重播
+| 偵測器 | 語料 | 結果 | 身分 |
+|---|---|---|---|
+| schema break | NYC TLC 27 個月真實發布歷史 | **27/27** 月精確正確、0 誤報 | 開發 benchmark |
+| orphaned doc | dbt_hubspot | **4/4**、432 負例 0 誤報 | 開發驗證 |
+| orphaned doc | **dbt_iterable** | **2/2**、199 負例 0 誤報 | **凍結 holdout，單跑** |
 
-描述寫一次（對著 2023-01 的 schema），之後不再改；每個月的真實 parquet schema 依序 ingest。
+凍結流程：選源規則先 commit → 受評 6 檔先 hash → 16 個候選機械淘汰 → 只跑一次。
+`python3 bench/freeze.py --check` 可驗。
 
-| | |
-|---|---|
-| 精確正確的月份 | **27/27** |
-| 漂移在發生當月抓到 | **2/2** |
-| 誤報 | **0** |
+⚠️ **兩個誠實註記**：holdout 只有 2 個正例，證明機制可轉移不證明比率；
+選源門檻仍用舊 oracle 評估（算文件編輯數），規則凍結在前所以照套，分母只有 2 就是這個不一致的顯影。
 
-以**狀態**計分不是事件：改名後描述從沒修過，所以正確答案是 2023-02 **與其後每個月**都要報。
-報一次就安靜是失敗。這是 27 個連續判斷不是 2 個。標籤來自 TLC 自己發布的 parquet 差集。
-細節：`bench/REPLAY-REPORT.md`。
-
-⚠️ 這是**開發 benchmark**。TLC 資料塑造過這個偵測器。它證明的是機制在真實 schema 歷史上
-端到端可運作，不是泛化宣告。
-
-### 三個 dbt 語料為何不再是主要證據
-
-舊設計下跑過 dbt_shopify / dbt_fivetran_log / dbt_hubspot。數字撤下，因為**標籤量的不是這件事**：
-`dbt_shopify` 的 10 筆 IDENTIFIER_CHANGE 正例裡，**9 筆的被引用 token 在漂移窗兩端都不是該
-model 的欄位**——是列舉值（`fixed_amount`、`percentage`）與上游 model 名。舊偵測器正是打到
-那些 token 才算命中，而標籤型 oracle 對「因錯誤理由給出正確判定」也記一分。
-
-語料與該發現都留在 repo，但不再是頭條證據。
+**舊的三個 dbt 語料數字已撤下**：標籤量的是「描述後來被編輯」，
+`dbt_shopify` 10 筆正例裡 9 筆的被引用 token 在漂移窗兩端都不是該 model 的欄位。
 
 ## 4. 端到端閉環（已實際執行，非 dry-run）
 
