@@ -7,20 +7,28 @@
 # Two independent captures at the same viewport, and a pixel diff, do.
 set -euo pipefail
 
-SERVER="${1:-http://localhost:8080}"
 URN='urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)'
 PY=.venv/bin/python
 
 # Writes to runs/ by default. This script re-captures both frames, so pointing it
-# at docs/evidence would overwrite the committed pair it exists to explain -- and
-# a rerun during filming would silently replace the images the documents cite.
-# `--publish` is how they get regenerated on purpose.
+# at docs/evidence would overwrite the committed pair it exists to explain, and a
+# rerun during filming would silently replace the images the documents cite.
+# `--publish` is how they get regenerated, on purpose.
+#
+# Parsed in a loop rather than by position: an earlier version assigned $1 to
+# SERVER before testing it for the flag, so `prove_invisible.sh --publish` -- the
+# obvious way to type it -- set SERVER=--publish and then published anyway.
+SERVER=http://localhost:8080
 OUT=runs/invisible
-if [ "${2:-}" = "--publish" ] || [ "${1:-}" = "--publish" ]; then
-  OUT=docs/evidence
-fi
+for arg in "$@"; do
+  case "$arg" in
+    --publish) OUT=docs/evidence ;;
+    -*) echo "unknown option: $arg" >&2; exit 2 ;;
+    *) SERVER="$arg" ;;
+  esac
+done
 mkdir -p "$OUT"
-echo "frames -> $OUT"
+echo "server $SERVER, frames -> $OUT"
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 

@@ -11,7 +11,10 @@ dependencies = ["acryl-datahub", "datahub-agent-context", "typer", "PyYAML"]
 stilltrue = "stilltrue.cli:app"
 
 [build-system]
-requires = ["setuptools>=68"]
+# >=77 because `license`/`license-files` above are PEP 639, which older
+# setuptools rejects outright -- and `pip install -e .` is the first line of the
+# README, so breaking it breaks the first thing anyone runs.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

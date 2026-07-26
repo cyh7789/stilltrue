@@ -2,8 +2,11 @@ Metadata-Version: 2.4
 Name: stilltrue
 Version: 0.1.0
 Summary: Finds DataHub context that has drifted out of sync with reality, proposes fixes with citations, and writes verdicts back to the graph.
+License-Expression: Apache-2.0
 Requires-Python: >=3.11
+License-File: LICENSE
 Requires-Dist: acryl-datahub
 Requires-Dist: datahub-agent-context
 Requires-Dist: typer
 Requires-Dist: PyYAML
+Dynamic: license-file
