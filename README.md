@@ -160,57 +160,52 @@ similarly named replacement, now reads as abstention rather than drift.
 
 ## Evidence
 
-The number that matters is the one measured on a source this code had never
-seen, after its rules were frozen:
+Most submissions report the number their tool scores on the data they built it
+with. This one reports what happened when it met two corpora it had never seen,
+after its rules were hashed and locked.
 
-| | Result |
-|---|---|
-| **Frozen holdout** — [`fivetran/dbt_fivetran_log`](https://github.com/fivetran/dbt_fivetran_log) | **13/32** identifier changes, 9.6% false positives |
+| | recall | false positives | |
+|---|---|---|---|
+| `dbt_shopify` | 70% | 2.2% | development benchmark — shaped the rules |
+| **`dbt_fivetran_log`** | **41%** | 9.6% | **frozen holdout v1**, scored once |
+| **`dbt_hubspot`** | **33%** | 13.8% | **frozen holdout v2**, scored once |
 
-Everything else here is a development benchmark, and the difference is not
-cosmetic — on `dbt_shopify` the same detector scores **9/10**. Recall halved and
-false positives doubled when the corpus changed. The 90% was fitted; the 41% is
-the one to carry forward.
+**Two independent holdouts agree: in the field this finds a third to a half of
+what the development number suggests.** One holdout can be unlucky; two is a
+property of the tool. Both numbers are published unchanged — v1's failures were
+fixed and v1 was then retired to a development benchmark, which is why v2 exists
+and why v2 was drawn from a fresh freeze.
 
-| Development benchmark | Result | Where the labels come from |
-|---|---|---|
-| NYC TLC trip records | 2/2, 0 false positives | the diff between two published parquet schemas |
-| [`fivetran/dbt_shopify`](https://github.com/fivetran/dbt_shopify) | 9/10 identifier changes, 4.5% false positives on 1,933 negatives | the upstream project's own documentation-fix commits |
+NYC TLC is the third development benchmark: 2/2 with zero false positives on the
+two real drift events in 35 months of published schemas
+([`bench/REPORT.md`](bench/REPORT.md)).
 
-**Both development benchmarks changed the code.** The TLC scan returning nothing
-is what surfaced the `editableProperties` bug; a branch in `detectors.py` was
-chosen because 9 of 10 dbt_shopify positives lived there. A benchmark that shaped
-the rules measures fit, not transfer, and the holdout is what puts a number on
-the difference. Timeline with commit hashes:
-[`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
+### Why you can check that rather than take our word
 
-### How the holdout was kept honest
-
-Three things, each checkable rather than promised:
-
-1. **The selection rule was committed before any candidate was inspected**
-   (`f1661c0`): public `fivetran/dbt_*` repositories, alphabetical, first one
-   clearing fixed thresholds. Fifteen were rejected with a mechanical reason
-   each — the walk is in `bench/holdout-selection.json`.
-2. **The graded files were hashed before the source was fetched**
-   (`bench/freeze.json`). `python3 bench/freeze.py --check` re-derives them and
-   exits 1 on any drift.
+1. **The selection rule was committed before any candidate was inspected.**
+   Public `fivetran/dbt_*` repos, alphabetical, first clearing six fixed
+   thresholds. Seventeen were rejected in the v2 walk with a mechanical reason
+   each ([`bench/holdout-selection.json`](bench/holdout-selection.json)).
+2. **The graded files were hashed before the source was fetched.**
+   `python3 bench/freeze.py --check` re-derives them and exits 1 on drift — it
+   did exactly that when the v1 fix landed, which is how the v2 round started.
 3. **The scorer was proven equivalent to the frozen one before it ran**, by
    reproducing the frozen script's published numbers on the old data exactly.
+4. **Every round is on the record**, including the frozen-holdout claim we
+   drafted and withdrew: [`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
 
-Scored once. Both failure modes it exposed — descriptions that enumerate values,
-and foreign-key prose naming a neighbouring table — are addressable and were
-left alone. A holdout that gets fixed until it agrees with the development set is
-a development set. Full analysis: [`bench/HOLDOUT-REPORT.md`](bench/HOLDOUT-REPORT.md).
+The pattern across three corpora is the finding: **each one writes prose the last
+one did not.** Enumerated values, foreign-key references, dbt doc blocks,
+uppercase entity types — every round has turned up a fresh way for a description
+to name something that is not a column. Full analyses in
+[`bench/HOLDOUT-REPORT.md`](bench/HOLDOUT-REPORT.md) and
+[`HOLDOUT-REPORT-v1.md`](bench/HOLDOUT-REPORT-v1.md).
 
-The dbt_shopify number is deliberately split by category
-([`bench/SHOPIFY-REPORT.md`](bench/SHOPIFY-REPORT.md)). This detector compares
-identifiers named in prose against the schema, so it addresses identifier
-changes and structurally cannot address deprecation notices — 17 of those 30
-positives name no identifier at all.
-
-The TLC benchmark needs no human labelling at all: run `bench/oracles/scan_tlc.py`
-and the two events fall out of the published schemas.
+The dbt_shopify number is split by category
+([`bench/SHOPIFY-REPORT.md`](bench/SHOPIFY-REPORT.md)): this detector compares
+identifiers named in prose against the schema, so it addresses identifier changes
+and structurally cannot address deprecation notices — 17 of those 30 positives
+name no identifier at all.
 
 ### Does this actually need a context platform?
 

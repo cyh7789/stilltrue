@@ -1,12 +1,12 @@
 {
-  "selected": "dbt_fivetran_log",
-  "url": "https://github.com/fivetran/dbt_fivetran_log",
+  "selected": "dbt_hubspot",
+  "url": "https://github.com/fivetran/dbt_hubspot",
   "licence": "Apache-2.0",
-  "commits": 744,
-  "months": 71,
-  "descriptions": 364,
-  "positives": 109,
-  "negatives": 109,
-  "labels_file": "drift-labels-dbt-fivetran-log.jsonl",
-  "frozen_rule_commit": "f1661c0e7d0e9e15f9df325974953d60e0076d6c"
+  "commits": 643,
+  "months": 72,
+  "descriptions": 1633,
+  "positives": 48,
+  "negatives": 938,
+  "labels_file": "drift-labels-dbt-hubspot.jsonl",
+  "frozen_rule_commit": "954415d990e2b58871eca83ed8676bd7ddfb3e3e"
 }
