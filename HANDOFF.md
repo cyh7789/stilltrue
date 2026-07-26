@@ -37,14 +37,22 @@ DataHub 不清理、UI 沒有欄位可以渲染、Agent Context Kit 整個 aspec
 
 | 偵測器 | 語料 | 結果 | 身分 |
 |---|---|---|---|
-| schema break | NYC TLC 31 個月真實發布歷史 | 31/31 月精確、0 誤報 | 開發 benchmark |
+| schema break | NYC TLC 41 個月真實發布歷史 | 41/41 月精確、0 誤報 | 開發 benchmark |
 | orphaned doc | dbt_hubspot | 4/4、432 負例 0 誤報 | 開發驗證 |
 | orphaned doc | **dbt_iterable** | **2/2、199 負例 0 誤報** | **凍結 holdout，單跑** |
 
 57 測試綠。`bench/freeze.py --check` 綠（6 檔，凍結於 commit `ca13e88`）。
 
-TLC 重播 2026-07-26 重跑過，CDN 限流已解除。這輪多了 2025-04 至 2025-07 四個月，
-所以是 31 個月不是 27。逐月結果在 `bench/tlc-replay-results.jsonl`。
+TLC 重播 2026-07-26 重跑過，涵蓋 TLC 已發布的全部 41 個月（2023-01..2026-05）。
+逐月結果在 `bench/tlc-replay-results.jsonl`；schema 快取在 `bench/oracles/tlc-schemas.json`，
+所以重跑不用再打 CDN。
+
+⚠️ 這輪抓到一個**我自己犯的、跟本專案主題同型的錯**：舊 harness 報 27／31 個月，
+說「其餘尚未發布」——那是 CloudFront 限流被誤讀成事實。`fsspec` 對限流和檔案不存在
+拋同一個 `FileNotFoundError`，而這個 CDN 背後的 S3 沒開 ListBucket，
+所以連不存在的檔案也回 403 不是 404，狀態碼本身分不出來。
+現在 `is_published()` 用哨兵月份（2023-01）分辨：哨兵也連不上就是限流，
+整個跑停掉而不是把限流寫成關於資料的結論。
 
 ⚠️ 兩個誠實註記已寫進報告：holdout 只有 2 個正例（證明機制可轉移，不證明比率）；
 選源門檻仍用舊 oracle 評估，分母只有 2 就是這個不一致的顯影。

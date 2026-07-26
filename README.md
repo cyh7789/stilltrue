@@ -177,11 +177,11 @@ Two detectors, three corpora, one of them a frozen holdout scored once.
 
 | | corpus | result | |
 |---|---|---|---|
-| **schema break** — the prose names a field that is gone | NYC TLC, 31 months of published schema history | **31/31** months exactly right, 0 false alarms | development |
+| **schema break** — the prose names a field that is gone | NYC TLC, 41 months of published schema history | **41/41** months exactly right, 0 false alarms | development |
 | **orphaned doc** — documentation attached to a field that is gone | `fivetran/dbt_hubspot` | **4/4**, 0 false alarms on 432 | development |
 | **orphaned doc** | **`fivetran/dbt_iterable`** | **2/2**, 0 false alarms on 199 | **frozen holdout, one run** |
 
-### The 31 months
+### The 41 months
 
 A description written once against the January 2023 schema and never revised,
 then every month's real TLC parquet schema ingested in order — the ordinary
@@ -191,7 +191,7 @@ things happened and neither was announced: `airport_fee` became `Airport_fee` in
 
 Scored on *state*, not events. The rename was never corrected, so the right
 answer is to report it in 2023-02 **and every month after**; reporting it once
-and going quiet would be a failure. That is 31 consecutive decisions, not two.
+and going quiet would be a failure. That is 41 consecutive decisions, not two.
 Labels come from diffing the TLC's own published files
 ([`bench/REPLAY-REPORT.md`](bench/REPLAY-REPORT.md)).
 

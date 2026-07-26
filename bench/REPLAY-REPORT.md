@@ -1,6 +1,6 @@
-# Benchmark: 31 months of NYC TLC schema history, replayed
+# Benchmark: 41 months of NYC TLC schema history, replayed
 
-> Regenerate: `python3 bench/oracles/replay_tlc.py --months 35`
+> Regenerate: `python3 bench/oracles/scan_tlc.py` then `python3 bench/oracles/replay_tlc.py --months 41`
 > Per-month results: `bench/tlc-replay-results.jsonl`
 
 A description is written once, against the schema as it stood in January 2023,
@@ -23,15 +23,15 @@ ours.
 
 | | |
 |---|---|
-| Months replayed | **31** (2023-01 → 2025-07; later months not yet published) |
-| Months scored exactly right | **31/31** |
+| Months replayed | **41** (2023-01 → 2026-05, every month the TLC has published) |
+| Months scored exactly right | **41/41** |
 | Drift caught in the month it happened | **2/2** |
 | False alarms | **0** |
 
 Scored on *state*, not events. `airport_fee` was renamed in February 2023 and
 the description was never corrected, so the right answer is to report it in
 2023-02 **and in every month after** — reporting it once and going quiet would be
-a failure. The detector has to produce exactly the right set 31 times, not twice.
+a failure. The detector has to produce exactly the right set 41 times, not twice.
 
 ```
 OK   2023-01  expected -                asserted -
@@ -39,7 +39,7 @@ OK * 2023-02  expected ['airport_fee']  asserted ['airport_fee']
 OK   2023-03  expected ['airport_fee']  asserted ['airport_fee']
      …
 OK * 2025-01  expected ['airport_fee']  asserted ['airport_fee']
-OK   2025-07  expected ['airport_fee']  asserted ['airport_fee']
+OK   2026-05  expected ['airport_fee']  asserted ['airport_fee']
 ```
 
 ## What the evidence looks like
@@ -68,8 +68,20 @@ not a claim of generalisation.
 
 **What it does establish** is that the mechanism works end-to-end on real schema
 history: ingest what a real pipeline would ingest, ask DataHub what changed, and
-check whether the prose kept up. 31 consecutive correct decisions is a different
+check whether the prose kept up. 41 consecutive correct decisions is a different
 kind of evidence from a single snapshot score.
+
+**Where 41 comes from**, and a mistake worth recording. It is every month the
+TLC has published as of this run: 2026-05 is the last one, 2026-06 is not there
+yet. An earlier run of this harness reported 31 months and said the rest were
+"not yet published" — that was wrong, and the way it was wrong is the same
+mistake this whole project is about. `fsspec` raises `FileNotFoundError` for a
+rate limit and for a missing file alike, and the S3 origin behind this
+CloudFront has no ListBucket permission, so even a file that does not exist
+answers 403 rather than 404. The status code cannot separate them. `is_published()`
+does it with a sentinel: ask for `2023-01` too, and if that is also unreachable
+then nothing can be concluded about any month, so the run stops instead of
+writing a rate limit down as a fact about the TLC.
 
 **Why the earlier dbt benchmarks are gone.** Three dbt packages were scored
 before this and their numbers are not comparable, because the labels turned out
