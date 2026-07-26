@@ -94,7 +94,11 @@ read-back VERIFIED → 重掃該筆消失（`airport_fee` 由 DRIFT 轉 CURRENT�
 
 **規格定了但沒做：**
 
-1. **D2 新鮮度漂移** — 無程式碼。官方 `nyc-taxi` datapack 自帶 planted freshness issues 可當開發集，未使用
+1. **D2 新鮮度漂移** — 無程式碼，且**已測定在可得資料上做不出來**（`D2-FEASIBILITY.md`）：
+   76 張表中 0 筆描述宣稱更新週期；`get_entities` 不回傳任何時間戳；
+   `get_dataset_assertions(FRESHNESS)` 全庫 0 筆；`datasetProperties.lastModified` 有 26 筆但那是
+   datapack 建置時間。**BRIEF §8.5 記的 `nyc-taxi` datapack 不在官方 registry**——
+   `datahub datapack load nyc-taxi` 回 `Unknown data pack`，registry.json 只有 bootstrap 與 showcase-ecommerce
 2. **D4 ownership 漂移** — 無程式碼
 3. **D5 未接真實 LLM 判讀器，也未接進 CLI**。硬前提：`showcase-ecommerce` 的 `get_dataset_queries` 回傳 total 為 0，沒有輸入資料
 4. **內部 holdout（SPEC 三層資料的 B 層）** — 不存在。開發集只用了 `showcase-ecommerce`，`nyc-taxi` 與 `healthcare` 未使用

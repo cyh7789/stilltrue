@@ -53,10 +53,18 @@ network calls and can be tested against a fake. Connecting a real LLM judge is
 the remaining step — see `src/stilltrue/semantic.py`.
 
 The gaps in the numbering are deliberate and worth stating plainly. The design
-enumerated five drift families; **D2 (freshness drift — a description claiming a
-refresh cadence the data no longer keeps) and D4 (ownership drift) are not
-implemented.** They are not hidden behind an abstraction waiting to be filled in;
-there is no code for them. What ships is D1, D3 and an unwired D5.
+enumerated five drift families; **D2 (freshness drift) and D4 (ownership drift)
+are not implemented.** There is no code for them, hidden behind an abstraction or
+otherwise. What ships is D1, D3 and an unwired D5.
+
+D2 and D5 are blocked by the catalog rather than by effort, and the measurements
+are in [`docs/D2-FEASIBILITY.md`](docs/D2-FEASIBILITY.md): across 76 datasets in
+DataHub's own showcase catalog, **zero** descriptions claim a refresh cadence and
+**zero** freshness assertions exist, while `get_dataset_queries` returns
+`total: 0`. A description can drift from schema and lineage because DataHub
+stores schema and lineage. Open-source DataHub does not store refresh cadence or
+query history, so building those detectors here would mean authoring both the
+claim and the evidence — and grading ourselves on answers we wrote.
 
 ## Quickstart
 
@@ -257,8 +265,9 @@ Timeline with commit hashes: [`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-IN
 
 **Five drift families were designed; two run.** D1 (schema break, undocumented
 columns) and D3 (lineage drift) ship. D2 (freshness) and D4 (ownership) have no
-code at all. D5 (semantic conflict) is implemented but unwired — it needs real
-query history, and a catalog with none gives it nothing to work with.
+code at all. D5 (semantic conflict) is implemented but unwired. For D2 and D5 the
+blocker is measured, not estimated — see
+[`docs/D2-FEASIBILITY.md`](docs/D2-FEASIBILITY.md).
 
 ## Known limitations
 
