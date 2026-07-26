@@ -18,15 +18,30 @@ PY=.venv/bin/python
 # Parsed in a loop rather than by position: an earlier version assigned $1 to
 # SERVER before testing it for the flag, so `prove_invisible.sh --publish` -- the
 # obvious way to type it -- set SERVER=--publish and then published anyway.
-SERVER=http://localhost:8080
+SERVER=
 OUT=runs/invisible
+end_of_options=
 for arg in "$@"; do
+  if [ -z "$end_of_options" ]; then
+    case "$arg" in
+      --) end_of_options=1; continue ;;
+      --publish) OUT=docs/evidence; continue ;;
+      -*) echo "unknown option: $arg" >&2; exit 2 ;;
+    esac
+  fi
+  [ -n "$arg" ] || { echo "server may not be empty" >&2; exit 2; }
+  [ -z "$SERVER" ] || { echo "two servers given: $SERVER and $arg" >&2; exit 2; }
+  # After `--` a flag becomes an operand, per convention -- so `-- --publish`
+  # means "the server is literally --publish". Nothing good follows from that;
+  # every use here is an http address, so require one and fail loudly instead of
+  # handing garbage to curl three steps later.
   case "$arg" in
-    --publish) OUT=docs/evidence ;;
-    -*) echo "unknown option: $arg" >&2; exit 2 ;;
-    *) SERVER="$arg" ;;
+    http://*|https://*) ;;
+    *) echo "server must be an http(s) URL, got: $arg" >&2; exit 2 ;;
   esac
+  SERVER="$arg"
 done
+SERVER="${SERVER:-http://localhost:8080}"
 mkdir -p "$OUT"
 echo "server $SERVER, frames -> $OUT"
 

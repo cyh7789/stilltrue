@@ -10,11 +10,20 @@ Usage: python3 scripts/diff_frames.py before.png after.png
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from PIL import Image
 
 
 def main() -> None:
+    if len(sys.argv) != 3:
+        print(__doc__)
+        sys.exit(2)
+    missing = [p for p in sys.argv[1:3] if not Path(p).is_file()]
+    if missing:
+        print(f"  no such file: {', '.join(missing)}")
+        sys.exit(2)
+
     a = Image.open(sys.argv[1]).convert("RGB")
     b = Image.open(sys.argv[2]).convert("RGB")
     if a.size != b.size:

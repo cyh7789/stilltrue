@@ -27,6 +27,13 @@ PRS = [
 
 def main() -> None:
     args = sys.argv[1:]
+    if "--out" in args and args.index("--out") + 1 >= len(args):
+        print("  --out needs a directory")
+        sys.exit(2)
+    unknown = [a for a in args if a.startswith("-") and a != "--out"]
+    if unknown:
+        print(f"  unknown option: {unknown[0]}")
+        sys.exit(2)
     out = Path(args[args.index("--out") + 1] if "--out" in args else "docs/evidence/prs")
     out.mkdir(parents=True, exist_ok=True)
 
