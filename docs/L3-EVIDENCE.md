@@ -219,20 +219,43 @@ dataset pages do not render it, and an agent built on the Kit never receives it.
 The aspect API returns it fine — the `curl` above is that route. `D1_ORPHANED_DOC`
 is what makes it visible to someone who is not already querying aspects by hand.
 
-### Fixing it produces no screenshot, and that is the proof
+### Fixing it produces no screenshot, and that was measured rather than asserted
 
 `make demo` goes on to resolve this finding (steps 6 and 7): the write is refused
 without confirmation, the confirmed write reads back `VERIFIED`, and the rescan
-returns without it. Then the page looks like this:
+returns without it.
 
-![after removing the orphan](evidence/04-after-columns.png)
+An earlier version of this page made the point by showing the same image file
+twice. That proves a file was reused, not that DataHub rendered the same thing —
+so it is now a measurement. `scripts/prove_invisible.sh` rebuilds the drifted
+state, corrects the description so the orphan is the only thing left to change,
+captures the page, removes the orphan, captures again at the same viewport, and
+diffs:
 
-That is the same image as the one four sections up. Not a similar one — the same
-file. The schema still shows `Airport_fee`, the documentation still says
-`Airport_fee`, and nothing else moved, because the thing that was removed was
-never on the page to begin with.
+```
+$ bash scripts/prove_invisible.sh
+  1440x900, 1296000 pixels
+  differing pixels: 110  (0.0085%)
+  all differences inside x 704-783, y 252-265
+```
 
-So the before/after for this fix has to be the aspect:
+| | ![before](evidence/05-orphan-present.png) | ![after](evidence/06-orphan-removed.png) |
+|---|---|---|
+
+Those 110 pixels are one element, and it is not about the removal:
+
+```
+before:  12.0.0 - 13 seconds ago
+after:   12.0.0 - 25 seconds ago
+```
+
+A clock counting up. **The schema version does not even increment** — that chip
+tracks `schemaMetadata`, and removing an `editableSchemaMetadata` entry does not
+touch it. So DataHub's interface reports nothing whatsoever about this write: not
+the content, not a version, not a modified marker. Every other pixel on a
+1440×900 page is identical.
+
+The before/after for this fix therefore has to be the aspect:
 
 ```bash
 curl -s -u datahub:datahub \
@@ -244,10 +267,11 @@ curl -s -u datahub:datahub \
 | before | `['airport_fee']` — keyed to a column the schema has not had since 2023-02 |
 | after | `[]` |
 
-A judge who only watches the screen cannot tell this happened. That is the honest
-shape of the finding: a fault with no rendering has a fix with no rendering, and
-the aspect is where both live. It is also why `stilltrue apply` takes no `--to`
-here — there is no corrected text a person could have typed.
+A judge who only watches the screen cannot tell this happened, and now there is a
+number for that rather than a claim: 110 pixels, all of them a clock. That is the
+honest shape of the finding — a fault with no rendering has a fix with no
+rendering, and the aspect is where both live. It is also why `stilltrue apply`
+takes no `--to` here: there is no corrected text a person could have typed.
 
 ---
 
