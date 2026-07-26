@@ -42,6 +42,9 @@ SELECTION_RULE = {
     "population": "public repositories under github.com/fivetran whose name starts with 'dbt_'",
     "exclude": [
         "dbt_shopify and any dbt_shopify_* variant -- already used as a development benchmark",
+        "dbt_ad_reporting -- mined during the v1 selection walk, so its contents were seen",
+        "dbt_amplitude, dbt_asana, dbt_facebook_ads -- same, mined during the v1 walk",
+        "dbt_fivetran_log -- the v1 holdout; its failures shaped the v2 code, so it is now a development benchmark",
         "repositories archived at selection time",
     ],
     "order": "alphabetical by repository name",
@@ -56,6 +59,12 @@ SELECTION_RULE = {
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
+    "round": 2,
+    "round_1": (
+        "dbt_fivetran_log, 13/32 with 9.59% false positives. Its two failure modes were "
+        "fixed in 954415d, which is why it is excluded above -- a source that shaped the "
+        "code cannot grade it. Result kept in bench/HOLDOUT-REPORT-v1.md."
+    ),
 }
 
 

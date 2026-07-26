@@ -39,10 +39,15 @@ def candidates() -> list[dict]:
         if not batch:
             break
         repos += batch
+    # Excluded by name because the v1 walk mined them, so their contents were
+    # seen. A source this code has looked at cannot grade it.
+    seen = {"dbt_ad_reporting", "dbt_amplitude", "dbt_asana",
+            "dbt_facebook_ads", "dbt_fivetran_log"}
     out = [
         r for r in repos
         if r["name"].startswith("dbt_")
         and not r["name"].startswith("dbt_shopify")
+        and r["name"] not in seen
         and not r.get("archived")
     ]
     out.sort(key=lambda r: r["name"])

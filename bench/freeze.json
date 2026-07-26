@@ -1,8 +1,8 @@
 {
-  "frozen_at": "2026-07-26T03:21:59+00:00",
-  "git_commit": "f1661c0e7d0e9e15f9df325974953d60e0076d6c",
+  "frozen_at": "2026-07-26T03:56:57+00:00",
+  "git_commit": "954415d990e2b58871eca83ed8676bd7ddfb3e3e",
   "files": {
-    "src/stilltrue/detectors.py": "841234a7ca662067b9b4025a7e8ed3061e597ce40ca01d0733f0845b58e79702",
+    "src/stilltrue/detectors.py": "d5fb959739773cf8ef47bcf43151b3b63c94f92b51801f8b9a45c1331ac5a64a",
     "src/stilltrue/adapter.py": "6631433b4b67532aa872f0f305796ec03109914a3fd3aef1748e568a454a4457",
     "src/stilltrue/evidence.py": "75a7085c5da9acb3805815268b40666d4365dc3633aa0c906ef61afbbea6484d",
     "bench/oracles/mine_drift_labels.py": "73b96b41dd64cd55f67cc16e696bc2b2171177d7003a61fff855b27c37f95069",
@@ -12,6 +12,9 @@
     "population": "public repositories under github.com/fivetran whose name starts with 'dbt_'",
     "exclude": [
       "dbt_shopify and any dbt_shopify_* variant -- already used as a development benchmark",
+      "dbt_ad_reporting -- mined during the v1 selection walk, so its contents were seen",
+      "dbt_amplitude, dbt_asana, dbt_facebook_ads -- same, mined during the v1 walk",
+      "dbt_fivetran_log -- the v1 holdout; its failures shaped the v2 code, so it is now a development benchmark",
       "repositories archived at selection time"
     ],
     "order": "alphabetical by repository name",
@@ -25,7 +28,9 @@
       "mined_negatives": ">= 100"
     },
     "runs_allowed": 1,
-    "on_result": "published as measured; the frozen files are not modified in response"
+    "on_result": "published as measured; the frozen files are not modified in response",
+    "round": 2,
+    "round_1": "dbt_fivetran_log, 13/32 with 9.59% false positives. Its two failure modes were fixed in 954415d, which is why it is excluded above -- a source that shaped the code cannot grade it. Result kept in bench/HOLDOUT-REPORT-v1.md."
   },
   "note": "NYC TLC and fivetran/dbt_shopify are development benchmarks and are NOT covered by this freeze -- both shaped the code before it existed. See docs/VALIDATION-INTEGRITY.md."
 }

@@ -1,4 +1,10 @@
-# Frozen holdout: fivetran/dbt_fivetran_log
+# Frozen holdout v1: fivetran/dbt_fivetran_log
+
+> ⚠️ **Superseded as a holdout.** The two failure modes below were fixed in
+> `954415d`, so this source has shaped the code and is now a development
+> benchmark. The v2 holdout is a different source, drawn after a second freeze —
+> see `bench/HOLDOUT-REPORT.md`. This page is kept unedited as the record of what
+> the first frozen run found.
 
 > Scored once, on 2026-07-26T03:21:59+00:00 code.
 > Regenerate: `python3 bench/run_holdout_bench.py <clone> drift-labels-dbt-fivetran-log.jsonl`
@@ -62,12 +68,18 @@ accounts for several on its own: its descriptions carry quoted status literals
 does not treat as references at all, so a genuine rename inside that prose has
 nothing to match against.
 
-## Why nothing was changed
+## What was done about it
 
-Both failure modes are addressable — a cross-model reference check would take
-out most of the false positives, and a quoted-literal rule would recover some
-misses. Neither was made, because the point of the freeze is that this number
-survives being disappointing. A holdout that gets fixed until it agrees with the
-development set is a development set.
+Nothing, at first — and that was half right. Publishing 41% unchanged was
+correct and is not retracted. Refusing to *ever* fix what it found was not: the
+freeze rule says the graded files are "not modified **in response**", which bars
+re-grading the same source after a fix, not improving the product.
 
-The number to carry forward is **41%, not 90%**.
+A peer review made the cost concrete. On the development benchmark the detector
+surfaced 9 true findings against 87 false ones — 9.4% precision. Both failure
+modes were then fixed (`954415d`), this source became a development benchmark,
+and a second freeze drew a new source that had never been seen.
+
+What that means for this page: **the numbers below stand as the honest record of
+the v1 system.** They are not the current system's numbers, and this source can
+never grade the current system again.
