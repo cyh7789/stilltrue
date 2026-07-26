@@ -35,6 +35,21 @@ step "5. Re-scan: the rename finding is gone"
 stilltrue scan --urn "$URN" --server "$SERVER"
 stilltrue findings
 
-step "6. The audit chain covers the refusals too"
+step "6. The orphaned note: nothing to rewrite, so the fix is derived"
+# No --to here. The description is attached to a field that does not exist, so
+# there is no corrected text to supply -- the proposal comes from the schema:
+# move it to the successor if that one is undocumented, otherwise remove it.
+# DataHub's own updateDescription cannot touch either case; it refuses a column
+# the schema does not have.
+ORPHAN=$(stilltrue findings | grep ORPHANED_DOC | sed 's/.*\[\([^]]*\)\].*/\1/')
+OTOKEN=$({ stilltrue apply "$ORPHAN" --server "$SERVER" 2>/dev/null || true; } \
+         | grep -o 'proposal_hash=[0-9a-f]*' | cut -d= -f2)
+stilltrue apply "$ORPHAN" --approve "$OTOKEN" --commit --server "$SERVER"
+
+step "7. Re-scan: the orphaned note is gone too"
+stilltrue scan --urn "$URN" --server "$SERVER"
+stilltrue findings
+
+step "8. The audit chain covers the refusals too"
 # Explicitly the first run: that ledger holds the scan, both refusals and the write.
 stilltrue verify --run "$RUN"

@@ -168,10 +168,63 @@ def verify(run: Optional[str] = typer.Option(None, help="Run id; defaults to the
     raise typer.Exit(0 if ok else 1)
 
 
+def _orphan_proposal(adapter: ReadOnlyDataHubAdapter, f: dict) -> Proposal:
+    """What to do about documentation attached to a field that is gone.
+
+    Two outcomes, decided from a fresh read rather than from the finding:
+
+      the field was renamed and the successor carries no documentation
+          -> move the text onto the successor, so the knowledge survives
+      anything else
+          -> remove the entry, because it describes nothing and nothing can
+             display it
+
+    Never overwrite. If the successor already says something, that text belongs
+    to whoever wrote it and a merge is an editorial judgement this tool does not
+    make -- the orphan is removed and the finding says where the text went.
+    """
+    from .detectors import _rename_candidate
+
+    urn, orphan = f["entity_urn"], f["subject"]
+    schema, ev_s = adapter.list_schema_fields(urn)
+    live = {x.get("fieldPath", "") for x in schema.get("fields", [])}
+    documented = {x.get("fieldPath", ""): (x.get("description") or "")
+                  for x in schema.get("fields", [])}
+    authored, ev_a = adapter.authored_field_descriptions(urn)
+
+    text = authored.get(orphan, "")
+    successor = _rename_candidate(orphan, live)
+    evidence = f["evidence_ids"] + [ev_s, ev_a]
+
+    if successor and not documented.get(successor, "").strip() \
+            and not authored.get(successor, "").strip():
+        return Proposal(
+            entity_urn=urn, aspect="field_description", verdict="DRIFT",
+            subject=successor, before_value="", after_value=text,
+            rationale=(f"`{orphan}` is gone and `{successor}` replaced it with no "
+                       f"documentation of its own; this text describes the same column."),
+            evidence_ids=evidence,
+        )
+
+    why = (f"`{successor}` replaced it but already carries its own description"
+           if successor else "no field replaced it")
+    return Proposal(
+        entity_urn=urn, aspect="field_description_removal", verdict="DRIFT",
+        subject=orphan, before_value=text, after_value="",
+        rationale=(f"the schema has no `{orphan}` and {why}; the text is attached to "
+                   f"nothing and no DataHub view can render it."),
+        evidence_ids=evidence,
+    )
+
+
 @app.command()
 def apply(
     finding_id: str = typer.Argument(..., help="Which finding to act on"),
-    new_value: str = typer.Option(..., "--to", help="The corrected content"),
+    new_value: str = typer.Option(
+        "", "--to",
+        help="The corrected content. Not used for an orphaned-doc finding: there is "
+             "nothing to rewrite, so the fix is derived from the schema.",
+    ),
     approve: Optional[str] = typer.Option(
         None, "--approve",
         help="The proposal_hash you are confirming. Run without it first to see the diff and the hash.",
@@ -197,14 +250,16 @@ def apply(
             rows = [json.loads(l) for l in ev_path.read_text(encoding="utf-8").splitlines() if l]
             adapter.evidence.hydrate(rows)
 
-        entity, ev = adapter.get_entity(f["entity_urn"])
-        before = authored_description(entity)
-
-        p = Proposal(
-            entity_urn=f["entity_urn"], aspect="dataset_description", verdict="DRIFT",
-            subject="description", before_value=before, after_value=new_value,
-            rationale=f["reality"], evidence_ids=f["evidence_ids"] + [ev],
-        )
+        if f["category"] == "D1_ORPHANED_DOC":
+            p = _orphan_proposal(adapter, f)
+        else:
+            entity, ev = adapter.get_entity(f["entity_urn"])
+            p = Proposal(
+                entity_urn=f["entity_urn"], aspect="dataset_description", verdict="DRIFT",
+                subject="description", before_value=authored_description(entity),
+                after_value=new_value,
+                rationale=f["reality"], evidence_ids=f["evidence_ids"] + [ev],
+            )
         result = PolicyGate(adapter.evidence).check(p)
 
     ledger.append("propose", d.name, p.entity_urn,
@@ -226,8 +281,9 @@ def apply(
         # The gate says the proposal is well formed. Nobody has said they want
         # it. Showing the diff here is the point: this is what gets reviewed.
         typer.echo(f"\n{decision.status}: {decision.detail}\n")
-        typer.echo(f"  - {before}")
-        typer.echo(f"  + {new_value}")
+        typer.echo(f"  {p.aspect} on `{p.subject}`")
+        typer.echo(f"  - {p.before_value or '(nothing)'}")
+        typer.echo(f"  + {p.after_value or '(removed)'}")
         raise typer.Exit(3)
 
     typer.echo(f"Confirmed ({decision.detail})")
@@ -236,10 +292,20 @@ def apply(
         """Fetch the live value. Must actually hit DataHub, or the read-back
         check compares the proposal against a stale copy and always fails."""
         with ReadOnlyDataHubAdapter(server=server) as a:
+            if prop.aspect in ("field_description", "field_description_removal"):
+                authored, _ = a.authored_field_descriptions(prop.entity_urn)
+                return authored.get(prop.subject, "")
             current, _ = a.get_entity(prop.entity_urn)
             return authored_description(current)
 
-    executor = WriteExecutor(reader=reread, server=server, dry_run=not commit)
+    def live_fields(prop: Proposal) -> set[str]:
+        """Which fields the schema has right now -- a removal turns on this."""
+        with ReadOnlyDataHubAdapter(server=server) as a:
+            schema, _ = a.list_schema_fields(prop.entity_urn)
+            return {x.get("fieldPath", "") for x in schema.get("fields", [])}
+
+    executor = WriteExecutor(reader=reread, server=server, dry_run=not commit,
+                             schema_reader=live_fields)
     receipt = executor.execute(p, p.proposal_hash)
     ledger.append("execute", d.name, p.entity_urn, receipt.to_dict())
 

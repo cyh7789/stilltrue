@@ -91,3 +91,39 @@ def test_write_failure_is_recorded_not_raised():
 
     assert r.status == "FAILED"
     assert "ConnectionError" in r.detail
+
+
+def _removal() -> Proposal:
+    return Proposal(
+        entity_urn=URN, aspect="field_description_removal", verdict="DRIFT",
+        subject="airport_fee",
+        before_value="Only charged on LGA and JFK pickups.", after_value="",
+        rationale="the schema has no airport_fee; this note is attached to nothing.",
+        evidence_ids=["ev_1"],
+    )
+
+
+def test_a_removal_is_refused_while_the_field_is_still_in_the_schema():
+    """The guard that makes the gate's exemption safe.
+
+    Between the scan and the confirmation someone may have re-added the column --
+    a rollback, a re-run of the pipeline that dropped it. Then the description is
+    not orphaned any more and removing it would delete a live field's
+    documentation, which is the thing the gate refuses everywhere else.
+    """
+    p = _removal()
+    ex = WriteExecutor(reader=lambda _: p.before_value, server="http://x",
+                       schema_reader=lambda _: {"airport_fee", "fare_amount"})
+    receipt = ex.execute(p, p.proposal_hash)
+
+    assert receipt.status == "CONFLICT"
+    assert "airport_fee" in receipt.detail
+
+
+def test_a_removal_proceeds_once_the_field_is_really_gone():
+    p = _removal()
+    ex = WriteExecutor(reader=lambda _: p.before_value, server="http://x",
+                       schema_reader=lambda _: {"Airport_fee", "fare_amount"},
+                       dry_run=True)
+
+    assert ex.execute(p, p.proposal_hash).status == "VERIFIED"

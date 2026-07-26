@@ -164,3 +164,42 @@ def test_a_too_short_prefix_is_refused():
 
     assert not decision.authorised
     assert decision.status == "STALE"
+
+
+def test_removing_an_orphaned_description_is_allowed_to_be_empty():
+    """The one deletion the gate permits, and only for the aspect that means it.
+
+    Blanking a live field's description is vandalism, which is why the gate
+    refuses an empty `after_value`. Removing an editableSchemaMetadata entry
+    keyed to a field the schema no longer has removes nothing a reader can see --
+    it is the only way to resolve an orphaned description, since DataHub's own
+    updateDescription refuses a column that is not in the schema.
+    """
+    store, ev = _store_with_one_evidence()
+    p = _valid_proposal(ev, aspect="field_description_removal", subject="airport_fee",
+                        before_value="Only charged on LGA and JFK pickups.",
+                        after_value="",
+                        rationale="the schema has no airport_fee; this note is attached to nothing.")
+
+    assert PolicyGate(store).check(p).passed
+
+
+def test_a_removal_must_have_something_to_remove():
+    """An empty before means there is no orphan here, so nothing is being fixed."""
+    store, ev = _store_with_one_evidence()
+    p = _valid_proposal(ev, aspect="field_description_removal", subject="airport_fee",
+                        before_value="", after_value="",
+                        rationale="nothing to say")
+    result = PolicyGate(store).check(p)
+
+    assert not result.passed
+    assert any("nothing to remove" in v for v in result.violations)
+
+
+def test_blanking_a_normal_description_is_still_refused():
+    """The exemption is for one aspect only; it must not widen the rule."""
+    store, ev = _store_with_one_evidence()
+    result = PolicyGate(store).check(_valid_proposal(ev, after_value="   "))
+
+    assert not result.passed
+    assert any("blank" in v for v in result.violations)

@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Literal
 
 from .evidence import canonical_hash
-from .proposal import Proposal
+from .proposal import REMOVAL_ASPECT, Proposal
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -79,11 +79,16 @@ class WriteExecutor:
         server: str = "http://localhost:8080",
         token: str | None = None,
         dry_run: bool = False,
+        schema_reader: Callable[[Proposal], set[str]] | None = None,
     ) -> None:
         self.reader = reader
         self.server = server
         self.token = token
         self.dry_run = dry_run
+        # Only a removal needs this: it is the one write whose safety depends on
+        # a field being absent, so the fact has to be re-established here rather
+        # than trusted from the scan that produced the finding.
+        self.schema_reader = schema_reader
         self._receipts: dict[str, Receipt] = {}
 
     def execute(self, p: Proposal, approved_hash: str) -> Receipt:
@@ -103,6 +108,18 @@ class WriteExecutor:
                            "subject": p.subject, "value": current}) != p.before_hash:
             return self._record(Receipt(key, p.proposal_hash, p.entity_urn, "CONFLICT",
                                         "re-read before write shows the current value no longer matches the proposal baseline; nothing written"))
+
+        if p.aspect == REMOVAL_ASPECT:
+            # The column may have come back between the scan and now -- a
+            # rollback, or the pipeline that dropped it running again. Then the
+            # description is not orphaned any more, and removing it would delete
+            # a live field's documentation.
+            live = self.schema_reader(p) if self.schema_reader else set()
+            if p.subject in live:
+                return self._record(Receipt(
+                    key, p.proposal_hash, p.entity_urn, "CONFLICT",
+                    f"`{p.subject}` is in the schema again, so its description is not "
+                    f"orphaned; nothing removed"))
 
         if self.dry_run:
             return self._record(Receipt(key, p.proposal_hash, p.entity_urn, "VERIFIED",
@@ -139,8 +156,36 @@ class WriteExecutor:
                     entity_urn=p.entity_urn, operation="replace",
                     description=p.after_value, column_path=p.subject,
                 )
+            elif p.aspect == REMOVAL_ASPECT:
+                self._remove_field_description(client, p)
             else:
                 raise ValueError(f"executor does not support aspect: {p.aspect}")
+
+    @staticmethod
+    def _remove_field_description(client: Any, p: Proposal) -> None:
+        """Drop one entry from editableSchemaMetadata, leaving the rest alone.
+
+        Not via the Agent Context Kit: `update_description` is its only write for
+        this aspect and DataHub answers BAD_REQUEST for a column the schema does
+        not have, which is every column this is called for. The aspect is
+        rewritten without the orphaned entry instead.
+        """
+        from datahub.emitter.mcp import MetadataChangeProposalWrapper
+        from datahub.metadata.schema_classes import EditableSchemaMetadataClass
+
+        graph = client._graph
+        current = graph.get_aspect(p.entity_urn, EditableSchemaMetadataClass)
+        if current is None:
+            raise ValueError(f"{p.entity_urn} has no editableSchemaMetadata to remove from")
+
+        kept = [i for i in current.editableSchemaFieldInfo if i.fieldPath != p.subject]
+        if len(kept) == len(current.editableSchemaFieldInfo):
+            raise ValueError(f"no editable entry for `{p.subject}`; nothing to remove")
+
+        graph.emit(MetadataChangeProposalWrapper(
+            entityUrn=p.entity_urn,
+            aspect=EditableSchemaMetadataClass(editableSchemaFieldInfo=kept),
+        ))
 
     def _record(self, r: Receipt) -> Receipt:
         self._receipts[r.idempotency_key] = r

@@ -69,7 +69,7 @@ model:
 | | What the humans wrote | What reality shows | How it's decided |
 |---|---|---|---|
 | **D1** schema break | a description references a field | DataHub's change log | deterministic |
-| **D1** orphaned doc | a field is documented | the field is not in the schema | deterministic |
+| **D1** orphaned doc | a field is documented | the field is not in the schema | deterministic, and fixable |
 | **D1** undocumented | table is documented | some fields aren't | deterministic |
 | **D3** lineage drift | "derived from X" | actual upstreams | deterministic |
 | **D5** semantic conflict | one glossary term, two definitions | how each side filters in real queries | prefilter → LLM → citation gate |
@@ -228,6 +228,35 @@ answer is to report it in 2023-02 **and every month after**; reporting it once
 and going quiet would be a failure. That is 41 consecutive decisions, not two.
 Labels come from diffing the TLC's own published files
 ([`bench/REPLAY-REPORT.md`](bench/REPLAY-REPORT.md)).
+
+### Fixing an orphaned description
+
+`stilltrue apply` takes no `--to` for this finding, because there is no corrected
+text to supply — the description is attached to a field that does not exist. The
+proposal is derived from a fresh read of the schema:
+
+- the field was **renamed** and the successor has no documentation of its own →
+  move the text onto the successor, so the knowledge survives
+- **anything else** → remove the entry, because it describes nothing and no
+  DataHub view can render it
+
+It never overwrites. If the successor already says something, that text belongs
+to whoever wrote it and merging is an editorial judgement this tool does not
+make; the orphan is removed and the rationale records why.
+
+Removal is the one deletion the Policy Gate permits, and only for this change
+type — blanking a live field's description is still refused. The safety
+condition is checked where it is actually true or false: the executor re-reads
+the schema immediately before writing and returns `CONFLICT` if the column has
+come back, because then the description is not orphaned any more.
+
+This is also the one write that cannot go through the Agent Context Kit.
+`update_description` is its only write for this aspect and DataHub answers
+`BAD_REQUEST` — *"Field X does not exist in the datasets schema"* — for every
+column this runs on, so the aspect is rewritten without the entry instead.
+
+`make demo` runs it end to end: scan finds it, the write is refused without
+confirmation, the confirmed write lands, and the rescan comes back without it.
 
 ### The benchmark that could not fail
 

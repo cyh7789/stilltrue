@@ -21,7 +21,17 @@ from .evidence import EvidenceStore, canonical_hash
 # Change types allowed to reach DataHub. Anything else is refused: a whitelist,
 # not a blacklist, so new capabilities require a deliberate decision instead of
 # being acquired through an oversight.
-ALLOWED_ASPECTS = ("dataset_description", "field_description", "tag")
+ALLOWED_ASPECTS = ("dataset_description", "field_description", "tag",
+                   "field_description_removal")
+
+# The one change type whose point is to end with nothing. Removing an
+# editableSchemaMetadata entry keyed to a field the schema no longer has takes
+# away nothing a reader can see, and it is the only way to resolve an orphaned
+# description: DataHub's own updateDescription refuses a column that is not in
+# the schema, so the text cannot be edited or emptied through it. Whether the
+# field really is absent is a write-time fact, so the executor re-reads the
+# schema and refuses if it is present -- the gate cannot check that here.
+REMOVAL_ASPECT = "field_description_removal"
 
 Verdict = Literal["DRIFT", "CURRENT", "INSUFFICIENT_EVIDENCE"]
 
@@ -147,7 +157,10 @@ class PolicyGate:
         if p.after_value.strip() == p.before_value.strip():
             v.append("before and after are identical, so this is not a change")
 
-        if not p.after_value.strip():
+        if p.aspect == REMOVAL_ASPECT:
+            if not p.before_value.strip():
+                v.append("removal proposal has nothing to remove; there is no orphan here")
+        elif not p.after_value.strip():
             v.append("proposal would blank the content; deletion is out of scope for a fix")
 
         if not p.rationale.strip():
