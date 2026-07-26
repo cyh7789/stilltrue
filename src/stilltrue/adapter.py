@@ -42,6 +42,13 @@ READ_ONLY_TOOLS = (
     "grep_documents",
 )
 
+# DataHub computes a semantic diff between successive versions of an aspect and
+# serves it as a change log. It is documented in the skills repo's own CLI
+# reference (`datahub timeline --category technical_schema`) but the Agent
+# Context Kit exposes no tool for it, so this is a direct REST read. Closing
+# that gap upstream is tracked in the README.
+TIMELINE_PATH = "/openapi/v2/timeline/v1/{urn}?categories={cats}&start=-3650d&end=0"
+
 
 class ReadOnlyDataHubAdapter:
     """A read-only window onto DataHub.
@@ -85,11 +92,51 @@ class ReadOnlyDataHubAdapter:
         return payload, self._record(urn, "get_entities", payload)
 
     def list_schema_fields(self, urn: str, limit: int = 100) -> tuple[dict, str]:
-        """List the dataset's fields: the main source of reality-side signal."""
+        """List the dataset's fields, with the descriptions a human would see.
+
+        The Kit's own tool drops those descriptions. Its GraphQL asks for
+        `editableSchemaMetadata.editableSchemaFieldInfo.description`, but the
+        Python that assembles the reply reads only `schemaMetadata.fields`, so
+        every field comes back documentation-free -- even though the tool's
+        docstring advertises matching on `description`. Measured on a dataset
+        with 19 of 20 fields documented: the Kit returns 0.
+
+        This is the field-level twin of the dataset-level bug fixed upstream in
+        datahub#18622. Until the same fix lands for fields, an agent built on
+        the Kit cannot audit field documentation at all, so the editable aspect
+        is merged in here.
+        """
         from datahub_agent_context.mcp_tools import list_schema_fields
 
         payload = list_schema_fields(urn, limit=limit)
+        authored = self._editable_field_descriptions(urn)
+        if authored:
+            payload = dict(payload)
+            payload["fields"] = [
+                {**f, "description": authored.get(f.get("fieldPath", ""), f.get("description", ""))}
+                for f in payload.get("fields", [])
+            ]
         return payload, self._record(urn, "list_schema_fields", payload)
+
+    def _editable_field_descriptions(self, urn: str) -> dict[str, str]:
+        """fieldPath -> the description someone wrote through the UI or API."""
+        import json
+        import urllib.parse
+        import urllib.request
+
+        path = f"/openapi/v3/entity/dataset/{urllib.parse.quote(urn, safe='')}"
+        req = urllib.request.Request(self.server + path)
+        req.add_header("Authorization", self._auth_header())
+        try:
+            entity = json.load(urllib.request.urlopen(req))
+        except Exception:
+            return {}
+        editable = (entity.get("editableSchemaMetadata") or {}).get("value", {})
+        return {
+            info["fieldPath"]: info["description"]
+            for info in editable.get("editableSchemaFieldInfo", [])
+            if info.get("fieldPath") and (info.get("description") or "").strip()
+        }
 
     def get_lineage(self, urn: str, upstream: bool = True, max_hops: int = 1) -> tuple[dict, str]:
         """Fetch lineage, used to check whether a claimed source is still upstream."""
@@ -104,6 +151,44 @@ class ReadOnlyDataHubAdapter:
 
         payload = get_dataset_queries(urn, column=column, count=count)
         return payload, self._record(urn, "get_dataset_queries", payload)
+
+    def schema_changes(self, urn: str) -> tuple[list[dict], str]:
+        """Ask DataHub which fields it has seen come and go on this dataset.
+
+        Returns the raw TECHNICAL_SCHEMA change events. Interpreting them is
+        `vanished_fields`'s job, not this one -- an adapter records what the
+        platform said.
+        """
+        import base64
+        import json
+        import urllib.parse
+        import urllib.request
+
+        path = TIMELINE_PATH.format(urn=urllib.parse.quote(urn, safe=""),
+                                    cats="TECHNICAL_SCHEMA")
+        req = urllib.request.Request(self.server + path)
+        req.add_header("Authorization", self._auth_header())
+        points = json.load(urllib.request.urlopen(req))
+        events = [
+            {
+                "operation": ev["operation"],
+                "field": (ev.get("modifier") or "").split(",")[-1].rstrip(")"),
+                "description": ev.get("description") or "",
+                "timestamp": point["timestamp"],
+                "semantic_version": point.get("semVer", ""),
+            }
+            for point in points
+            for ev in point["changeEvents"]
+            if ev.get("category") == "TECHNICAL_SCHEMA"
+        ]
+        return events, self._record(urn, "timeline", events)
+
+    def _auth_header(self) -> str:
+        import base64
+
+        if self.token:
+            return f"Bearer {self.token}"
+        return "Basic " + base64.b64encode(b"datahub:datahub").decode()
 
     def grep_documents(self, urns: list[str], pattern: str) -> tuple[dict, str]:
         """Search inside documents for prose still referencing an old field name."""

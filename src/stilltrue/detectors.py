@@ -49,40 +49,111 @@ class Finding:
         }
 
 
-def referenced_identifiers(text: str) -> set[str]:
-    """Pull the field names a description refers to.
+# Jinja that dbt has not expanded. `{{ doc("history_source") }}` is a lookup
+# key, not a column, and a catalog can hold the template rather than the text.
+TEMPLATE = re.compile(r"\{\{.*?\}\}|\{%.*?%\}", re.S)
 
-    Two spellings count: backticked `col_name`, and bare snake_case. Bare
-    identifiers must contain an underscore, otherwise ordinary English words
-    get mistaken for column names.
+# Dotted first, so `parent.child` is matched whole before anything splits it.
+DOTTED = re.compile(r"`([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+)`")
+BACKTICKED = re.compile(r"`([a-zA-Z_][a-zA-Z0-9_]*)`")
+BARE_SNAKE = re.compile(r"\b([a-zA-Z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)+)\b")
+
+
+@dataclass(frozen=True)
+class Mention:
+    value: str
+    kind: Literal["identifier", "unresolved_template"]
+
+
+@dataclass(frozen=True)
+class VanishedField:
+    """A field DataHub has seen leave this dataset and not come back."""
+    name: str
+    operation: str            # REMOVE, or MODIFY where the diff called it a rename
+    observed_at: int          # epoch millis of the version that dropped it
+    semantic_version: str
+    datahub_says: str         # DataHub's own wording, quoted in the finding
+
+
+RENAME_PHRASE = "renaming of the field"
+
+
+def vanished_fields(events: list[dict], current: set[str]) -> dict[str, VanishedField]:
+    """Read DataHub's schema change log; keep the fields that really are gone.
+
+    Two filters, and the second is load-bearing.
+
+    DataHub's differ matches schema versions **positionally**. When a single
+    version changes several things at once -- the NYC TLC replay drops a column,
+    renames another and changes three datatypes -- the matcher mis-pairs and
+    reports renames that never happened: "renaming of the field 'RatecodeID to
+    Airport_fee'". Those claims are self-correcting, because the field they say
+    was renamed away is still in the schema. Checking each claim against the
+    current field list leaves only the genuine departures. On that replay: three
+    claimed, one real, and the real one is the actual 2023-02 TLC event.
+
+    A field removed in one version and re-added in a later one is not vanished;
+    the current schema settles it.
+    """
+    gone: dict[str, VanishedField] = {}
+    for ev in sorted(events, key=lambda e: e.get("timestamp", 0)):
+        name, op = ev.get("field", ""), ev.get("operation", "")
+        if not name:
+            continue
+        departed = op == "REMOVE" or (op == "MODIFY" and RENAME_PHRASE in ev.get("description", ""))
+        if departed:
+            gone[name] = VanishedField(
+                name=name, operation="REMOVE" if op == "REMOVE" else "RENAMED_FROM",
+                observed_at=ev.get("timestamp", 0),
+                semantic_version=ev.get("semantic_version", ""),
+                datahub_says=ev.get("description", ""),
+            )
+        elif op == "ADD":
+            gone.pop(name, None)          # it came back
+    return {n: v for n, v in gone.items() if n not in current}
+
+
+def identifier_mentions(text: str) -> list[Mention]:
+    """Pull identifier *candidates* out of a description.
+
+    Candidates only. Nothing here decides whether a token is a field -- that
+    needs schema evidence, and looking like an identifier is not evidence.
+    Earlier versions of this module called these "field names", and treating the
+    guess as the answer is what made every new corpus produce a new false
+    positive.
     """
     if not text:
-        return set()
-    backticked = set(re.findall(r"`([a-zA-Z_][a-zA-Z0-9_]*)`", text))
-    # Bare identifiers may be mixed case (Airport_fee), but still need an underscore
-    bare_snake = set(re.findall(r"\b([a-zA-Z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)+)\b", text))
-    # Returned verbatim: case itself is a drift signal (TLC: airport_fee ->
-    # Airport_fee). Lowercasing here would erase the very thing we are hunting.
-    return backticked | bare_snake
+        return []
+
+    mentions: list[Mention] = []
+    if TEMPLATE.search(text):
+        mentions.append(Mention("", "unresolved_template"))
+    stripped = TEMPLATE.sub(" ", text)
+
+    seen: set[str] = set()
+    for rx in (DOTTED, BACKTICKED, BARE_SNAKE):
+        for value in rx.findall(stripped):
+            if value not in seen:
+                seen.add(value)
+                mentions.append(Mention(value, "identifier"))
+        # Dotted names are consumed whole so their parts are not re-extracted
+        # as two separate missing columns.
+        if rx is DOTTED:
+            for value in list(seen):
+                stripped = stripped.replace(f"`{value}`", " ")
+
+    # Sorted so finding ids stay stable across processes; templates lead.
+    return ([m for m in mentions if m.kind == "unresolved_template"]
+            + sorted((m for m in mentions if m.kind == "identifier"), key=lambda m: m.value))
 
 
-# When an identifier is followed by one of these, the author has named the kind
-# of thing it is, and it is not a column of this table.
+# When an identifier is followed by one of these, the author named the kind of
+# thing it is. Kept as noise reduction only: it can suppress an abstention, and
+# it must never overturn a verdict that has schema evidence behind it.
 NON_FIELD_QUALIFIERS = (
     "schema", "table", "database", "dataset", "model", "view", "catalog", "warehouse",
     "method", "strategy", "mode", "package", "macro", "grain",
 )
-
-# Phrases that introduce a list of the values a column can hold. What follows is
-# data, not schema -- and an enumerated value is spelled exactly like a column.
-ENUMERATION_MARKERS = (
-    "possible values", "valid values", "values include", "such as",
-    "one of", "either", "can be", "e.g.", "for example",
-)
-
-# Phrases that introduce a relationship. What follows names the *other* entity,
-# which is correct documentation, not a broken field reference.
-RELATION_MARKERS = ("foreign key", "referencing", "references the", "belongs to", "points to")
 
 
 def qualified_as_non_field(text: str, identifier: str) -> bool:
@@ -93,39 +164,6 @@ def qualified_as_non_field(text: str, identifier: str) -> bool:
     """
     pattern = rf"`?{re.escape(identifier)}`?\s+(?:\w+\s+){{0,2}}({'|'.join(NON_FIELD_QUALIFIERS)})\b"
     return re.search(pattern, text, flags=re.I) is not None
-
-
-def names_something_else(text: str, identifier: str) -> bool:
-    """Does the surrounding prose say this token is not a column of this table?
-
-    Four shapes, all measured on real descriptions rather than imagined:
-
-      "Possible values include `broken`, `deleted`"      -> values
-      "the discount applies to all items (`all`)"        -> a value in apposition
-      "Foreign key referencing the ID of the `account`"  -> another entity
-      "may differ from `incremental_mar.schema_name`"    -> another entity's column
-
-    An enumeration's scope runs to the end of the description rather than to the
-    end of its sentence. Written docs list values as bullets and sub-sentences --
-    "Valid values include: - `label_printed`: A label was purchased. -
-    `in_transit`: ..." -- so a per-sentence window loses the marker on every
-    item after the first, which is most of them.
-
-    Callers apply this only where the verdict would otherwise be an assertion
-    made without a rename candidate. A near-match in the schema is stronger
-    evidence than any prose and keeps its DRIFT verdict.
-    """
-    ref = re.escape(identifier)
-
-    if re.search(rf"\w\.{ref}\b|\b{ref}\.\w", text):
-        return True        # part of a dotted path: a qualified reference elsewhere
-
-    if re.search(rf"\(\s*`?{ref}`?\s*\)", text):
-        return True        # parenthesised: an example or a value in apposition
-
-    m = re.search(rf"`?{ref}`?", text)
-    head = text[: m.start()].lower() if m else ""
-    return any(marker in head for marker in ENUMERATION_MARKERS + RELATION_MARKERS)
 
 
 def self_reference_tokens(entity_urn: str) -> set[str]:
@@ -162,94 +200,86 @@ def detect_schema_break(
     entity_description: str,
     fields: list[dict],
     evidence_ids: list[str],
+    *,
+    vanished: dict[str, VanishedField] | None = None,
 ) -> list[Finding]:
-    """D1: do referenced fields still exist, and are any fields undocumented?
+    """D1: does the prose still name fields this dataset no longer has?
 
-    `fields` is what list_schema_fields returns: each entry carries fieldPath
-    and description.
+    An assertion needs proof the token was a field here. Two things qualify and
+    both come from DataHub:
+
+      a near-match in the current schema   the field was renamed (TLC's
+                                           airport_fee -> Airport_fee)
+      a departure in the change log        the field was deleted, with no
+                                           similarly-named successor to point at
+
+    Everything else abstains. That is the whole rule, and it is why there is no
+    list of English phrases in this module any more. Earlier versions asserted on
+    any unresolved identifier and then subtracted the shapes that turned out to
+    be prose -- enumerated values, neighbouring tables, entity types, unexpanded
+    Jinja. Each new corpus supplied a form the last one had not, because
+    "which English tokens are not column names" is an open-world problem.
+    Requiring evidence closes it: an enumerated value never appears in a schema
+    change log, so it can never be asserted, and no rule had to be written to
+    say so.
+
+    `vanished` is `None` when no change history was consulted and `{}` when one
+    was consulted and showed nothing. Both abstain; the finding says which.
     """
     actual = {f.get("fieldPath", "") for f in fields if f.get("fieldPath")}
     self_tokens = self_reference_tokens(entity_urn)
+    gone = vanished or {}
     findings: list[Finding] = []
 
-    # Every field reference on the authored side must resolve on the reality side
     sources = [("dataset description", entity_description)]
     sources += [
         (f'field "{f.get("fieldPath")}" description', f.get("description") or "")
         for f in fields
     ]
 
+    def add(**kw: Any) -> None:
+        findings.append(Finding(entity_urn=entity_urn, category="D1_SCHEMA_BREAK",
+                                evidence_ids=list(evidence_ids), **kw))
+
     for where, text in sources:
-        # sorted, not raw set order: findings are numbered by position, so an
-        # order that shifts with PYTHONHASHSEED makes every finding id printed
-        # in the docs wrong on the reader's machine.
-        for ref in sorted(referenced_identifiers(text)):
-            if ref in actual:   # exact match: different case means a different field
-                # Recorded rather than skipped. A report that only lists problems
-                # cannot show how much was checked, and an abstention is only
-                # believable next to the references that did resolve.
-                findings.append(
-                    Finding(
-                        entity_urn=entity_urn,
-                        category="D1_SCHEMA_BREAK",
-                        verdict="CURRENT",
-                        subject=ref,
-                        claim=f"{where} references `{ref}`",
-                        reality=f"`{ref}` is still a field on this dataset",
-                        evidence_ids=list(evidence_ids),
-                    )
-                )
+        for mention in identifier_mentions(text):
+            if mention.kind == "unresolved_template":
+                add(verdict="INSUFFICIENT_EVIDENCE", subject="{{ … }}",
+                    claim=f"{where} contains an unexpanded template",
+                    reality="the catalog holds Jinja rather than the text a reader sees",
+                    confidence="medium")
+                continue
+
+            ref = mention.value
+            if ref in actual:
+                add(verdict="CURRENT", subject=ref,
+                    claim=f"{where} references `{ref}`",
+                    reality=f"`{ref}` is still a field on this dataset")
                 continue
             if ref in self_tokens or ref.lower() in self_tokens:
-                continue        # refers to the table itself or its database/schema
+                continue
             if qualified_as_non_field(text, ref):
-                continue        # the text qualified it, e.g. "`x` schema"
+                continue
+
             candidate = _rename_candidate(ref, actual)
-
             if candidate:
-                # A case/underscore variant exists: strong signal (TLC case)
-                verdict, confidence = "DRIFT", "high"
-                reality = f"the schema has no `{ref}`, but it does have `{candidate}`"
-            elif where != "dataset description" and not names_something_else(text, ref):
-                # The reference came from a *field* description. That context is
-                # narrow: when a column's own documentation names another
-                # snake_case identifier, it is almost always a sibling column
-                # (surrogate keys list their components, derived fields name
-                # their inputs). A table description is prose and cites other
-                # tables, entity types and placeholders; a field description
-                # rarely does. Measured on fivetran/dbt_shopify: 9 of 10
-                # identifier-change positives live here.
-                #
-                # Unless the sentence says otherwise. Field descriptions also
-                # enumerate values and document relationships, and both spell
-                # things exactly like column names -- the single largest source
-                # of false positives on both benchmarks.
-                verdict, confidence = "DRIFT", "medium"
-                reality = f"the schema has no `{ref}` (it has {len(actual)} fields)"
-            else:
-                # A table description with no near-match to point at. Real ones
-                # are prose: they cite other tables, DataHub entity types, and
-                # placeholders like `table_name`. Calling every unresolved token
-                # drift produced far more noise than signal on real data.
-                # The cost: a genuinely deleted column named only in the table
-                # description reads as abstention. That trade is deliberate --
-                # a report nobody trusts is worth less than one that stays quiet.
-                verdict, confidence = "INSUFFICIENT_EVIDENCE", "medium"
-                reality = f"the text mentions `{ref}`, which is not a field here and has no close match"
-
-            findings.append(
-                Finding(
-                    entity_urn=entity_urn,
-                    category="D1_SCHEMA_BREAK",
-                    verdict=verdict,
-                    subject=ref,
+                add(verdict="DRIFT", subject=ref, suspected_rename=candidate,
                     claim=f"{where} references `{ref}`",
-                    reality=reality,
-                    evidence_ids=list(evidence_ids),
-                    suspected_rename=candidate,
-                    confidence=confidence,
-                )
-            )
+                    reality=f"the schema has no `{ref}`, but it does have `{candidate}`")
+            elif ref in gone:
+                v = gone[ref]
+                add(verdict="DRIFT", subject=ref,
+                    claim=f"{where} references `{ref}`",
+                    reality=f"DataHub's change log records it leaving at v{v.semantic_version}: "
+                            f"{v.datahub_says}")
+            else:
+                seen = ("no change history was available for this dataset"
+                        if vanished is None
+                        else "DataHub's change log has no record of it leaving")
+                add(verdict="INSUFFICIENT_EVIDENCE", subject=ref,
+                    claim=f"{where} references `{ref}`",
+                    reality=f"`{ref}` is not a field here and {seen}",
+                    confidence="medium")
 
     findings.extend(
         _undocumented_findings(entity_urn, entity_description, fields, evidence_ids)

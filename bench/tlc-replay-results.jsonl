@@ -1,0 +1,27 @@
+{"month": "2023-01", "expected": [], "asserted": [], "correct": true, "event_month": false, "reality": []}
+{"month": "2023-02", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": true, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-03", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-04", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-05", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-06", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-07", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-08", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-09", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-10", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-11", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2023-12", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-01", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-02", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-03", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-04", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-05", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-06", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-07", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-08", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-09", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-10", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-11", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2024-12", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2025-01", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": true, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2025-02", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
+{"month": "2025-03", "expected": ["airport_fee"], "asserted": ["airport_fee"], "correct": true, "event_month": false, "reality": ["the schema has no `airport_fee`, but it does have `Airport_fee`"]}
