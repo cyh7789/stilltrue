@@ -37,14 +37,14 @@ DataHub 不清理、UI 沒有欄位可以渲染、Agent Context Kit 整個 aspec
 
 | 偵測器 | 語料 | 結果 | 身分 |
 |---|---|---|---|
-| schema break | NYC TLC 27 個月真實發布歷史 | 27/27 月精確、0 誤報 | 開發 benchmark |
+| schema break | NYC TLC 31 個月真實發布歷史 | 31/31 月精確、0 誤報 | 開發 benchmark |
 | orphaned doc | dbt_hubspot | 4/4、432 負例 0 誤報 | 開發驗證 |
 | orphaned doc | **dbt_iterable** | **2/2、199 負例 0 誤報** | **凍結 holdout，單跑** |
 
 57 測試綠。`bench/freeze.py --check` 綠（6 檔，凍結於 commit `ca13e88`）。
 
-⚠️ TLC 27/27 是稍早跑的，**這輪沒重跑**——重跑要重新 ingest 27 個月的 parquet，
-而 TLC 的 CDN 目前對本機回 403 限流。結果在 `bench/tlc-replay-results.jsonl`。
+TLC 重播 2026-07-26 重跑過，CDN 限流已解除。這輪多了 2025-04 至 2025-07 四個月，
+所以是 31 個月不是 27。逐月結果在 `bench/tlc-replay-results.jsonl`。
 
 ⚠️ 兩個誠實註記已寫進報告：holdout 只有 2 個正例（證明機制可轉移，不證明比率）；
 選源門檻仍用舊 oracle 評估，分母只有 2 就是這個不一致的顯影。

@@ -1,4 +1,4 @@
-# Benchmark: 27 months of NYC TLC schema history, replayed
+# Benchmark: 31 months of NYC TLC schema history, replayed
 
 > Regenerate: `python3 bench/oracles/replay_tlc.py --months 35`
 > Per-month results: `bench/tlc-replay-results.jsonl`
@@ -23,15 +23,15 @@ ours.
 
 | | |
 |---|---|
-| Months replayed | **27** (2023-01 → 2025-03; later months not yet published) |
-| Months scored exactly right | **27/27** |
+| Months replayed | **31** (2023-01 → 2025-07; later months not yet published) |
+| Months scored exactly right | **31/31** |
 | Drift caught in the month it happened | **2/2** |
 | False alarms | **0** |
 
 Scored on *state*, not events. `airport_fee` was renamed in February 2023 and
 the description was never corrected, so the right answer is to report it in
 2023-02 **and in every month after** — reporting it once and going quiet would be
-a failure. The detector has to produce exactly the right set 27 times, not twice.
+a failure. The detector has to produce exactly the right set 31 times, not twice.
 
 ```
 OK   2023-01  expected -                asserted -
@@ -39,7 +39,7 @@ OK * 2023-02  expected ['airport_fee']  asserted ['airport_fee']
 OK   2023-03  expected ['airport_fee']  asserted ['airport_fee']
      …
 OK * 2025-01  expected ['airport_fee']  asserted ['airport_fee']
-OK   2025-03  expected ['airport_fee']  asserted ['airport_fee']
+OK   2025-07  expected ['airport_fee']  asserted ['airport_fee']
 ```
 
 ## What the evidence looks like
@@ -68,7 +68,7 @@ not a claim of generalisation.
 
 **What it does establish** is that the mechanism works end-to-end on real schema
 history: ingest what a real pipeline would ingest, ask DataHub what changed, and
-check whether the prose kept up. 27 consecutive correct decisions is a different
+check whether the prose kept up. 31 consecutive correct decisions is a different
 kind of evidence from a single snapshot score.
 
 **Why the earlier dbt benchmarks are gone.** Three dbt packages were scored

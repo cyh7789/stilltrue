@@ -30,7 +30,7 @@
 
 | 偵測器 | 語料 | 結果 | 身分 |
 |---|---|---|---|
-| schema break | NYC TLC 27 個月真實發布歷史 | **27/27** 月精確正確、0 誤報 | 開發 benchmark |
+| schema break | NYC TLC 31 個月真實發布歷史 | **31/31** 月精確正確、0 誤報 | 開發 benchmark |
 | orphaned doc | dbt_hubspot | **4/4**、432 負例 0 誤報 | 開發驗證 |
 | orphaned doc | **dbt_iterable** | **2/2**、199 負例 0 誤報 | **凍結 holdout，單跑** |
 
