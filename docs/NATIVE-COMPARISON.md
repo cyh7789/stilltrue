@@ -31,6 +31,31 @@ is referenced by `datahub-search`, `datahub-enrich` and `datahub-lineage`, and
 is not itself in the repository — the completeness surface is described but not
 yet shipped.)
 
+## Against the four agents DataHub itself proposed
+
+DataHub's own post *Building Autonomous Data Agents with DataHub Agent Context
+Kit* names four agents worth building. Three are plainly different work; the
+fourth is the one that needs answering, and it is the inverse of this project.
+
+| DataHub's agent | What it does, in DataHub's words | Relation to StillTrue |
+|---|---|---|
+| **Data Analytics** | text-to-SQL over descriptions, glossary terms, sample queries | *consumes* context; assumes it is true |
+| **Data Quality** | "automatically scans for **data** problems… adds data quality **assertions**" | subject is the data — row counts, distributions, values |
+| **Data Steward** | "cross-references schema metadata with glossary terms, then **applies** glossary terms and descriptions" | **writes** documentation |
+| **Data Engineering** | reads lineage and schema to generate transformation pipelines | subject is the pipeline |
+
+**StillTrue is the Data Steward Agent run backwards.** That agent produces
+documentation; this one takes documentation a human already produced and asks
+whether it is still true. Same object, opposite direction — and the reverse
+direction is the one nobody has built, because the forward direction is what
+everybody needs first. Once a Steward Agent has written descriptions across a
+catalog at machine speed, the question of which of them are still accurate a year
+later stops being hypothetical.
+
+The Data Quality Agent is the one most likely to be mistaken for this, and the
+distinction is one word: its assertions take **data** as their subject. Which
+brings us to why that is not a naming accident.
+
 ## Assertions cannot express it
 
 DataHub models data quality as typed assertions. The Agent Context Kit exposes
@@ -84,6 +109,22 @@ this page:
   native capability that reads a description and judges it, so such a baseline
   would either duplicate B1 or measure something we invented. The absent baseline
   *is* the finding.
+
+## We did not just write this down
+
+The gap named on this page has a pull request against it.
+[`datahub-project/datahub-skills#49`](https://github.com/datahub-project/datahub-skills/pull/49)
+adds `datahub-context-drift` — the workflow described here, as a DataHub skill,
+in DataHub's own repository, following the conventions of the skills already
+there. Whether or not it is merged, the argument is not "DataHub is missing
+something"; it is "DataHub is missing something, and here is the piece".
+
+A second PR, [`datahub-project/datahub#18622`](https://github.com/datahub-project/datahub/pull/18622),
+fixes something we hit while building: the Agent Context Kit had no shared way to
+resolve which of an entity's two descriptions a reader actually sees. That bug
+cost us a silent zero-findings scan before we found it (see
+[`VALIDATION-INTEGRITY.md`](VALIDATION-INTEGRITY.md)), and the fix is upstream so
+the next person does not pay for it.
 
 ## The honest limit of this argument
 

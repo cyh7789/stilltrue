@@ -240,11 +240,22 @@ with the mistake documented in the docstring.
   longer exists is drift; a terse one that is accurate is not.
 - **It cannot see context that isn't in DataHub.** Detection quality equals graph
   completeness. Nothing in the catalog means nothing to check.
-- **It does not rebuild what DataHub already ships.** DataHub Cloud's Context Hub
-  has built-in evaluations for context quality; this is the open-source side of
-  the problem, and it does not attempt to replace that. The full comparison —
-  what each DataHub skill declares it does, and why no assertion type can express
-  "this description is still true" — is in
+- **It does not rebuild what DataHub already ships.** DataHub's Data Quality
+  Agent creates assertions whose subject is the **data** — row counts,
+  distributions, freshness of the underlying table. StillTrue's subject is the
+  documentation: whether the prose a human wrote still matches the schema and
+  lineage DataHub already stores. DataHub's assertion type system has no type
+  that can express the second question — `DATASET`, `FRESHNESS`, `VOLUME`,
+  `SQL`, `FIELD`, `DATA_SCHEMA`, `CUSTOM`, all about data. You cannot write
+  "assert this description still names columns that exist", not because it would
+  fail but because there is nowhere to put it.
+
+  The closest of DataHub's four proposed agents is the **Data Steward Agent**,
+  which "applies glossary terms and descriptions". StillTrue is that agent run
+  backwards: it reads what was applied and asks whether it is still true. Same
+  object, opposite direction. DataHub Cloud's Context Hub does evaluate context
+  quality — it is Cloud-only and in private beta, so the open-source user has
+  nothing. Full comparison, in DataHub's own words:
   [`docs/NATIVE-COMPARISON.md`](docs/NATIVE-COMPARISON.md).
 - **It never writes without approval.** There is no autonomous mode, no
   `--yes-to-all`. A write always requires a token for the exact text being
