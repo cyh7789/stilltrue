@@ -1,12 +1,11 @@
 {
-  "frozen_at": "2026-07-26T03:56:57+00:00",
-  "git_commit": "954415d990e2b58871eca83ed8676bd7ddfb3e3e",
+  "frozen_at": "2026-07-26T06:19:49+00:00",
+  "git_commit": "ce3bb6d03ae613228941d6a211852e976a5d669f",
   "files": {
-    "src/stilltrue/detectors.py": "d5fb959739773cf8ef47bcf43151b3b63c94f92b51801f8b9a45c1331ac5a64a",
-    "src/stilltrue/adapter.py": "6631433b4b67532aa872f0f305796ec03109914a3fd3aef1748e568a454a4457",
-    "src/stilltrue/evidence.py": "75a7085c5da9acb3805815268b40666d4365dc3633aa0c906ef61afbbea6484d",
-    "bench/oracles/mine_drift_labels.py": "73b96b41dd64cd55f67cc16e696bc2b2171177d7003a61fff855b27c37f95069",
-    "bench/run_shopify_bench.py": "7e9836a4fb1f0d31e0d7da1c362c12dd3f460f1daa32b631d6e7460a182532a7"
+    "src/stilltrue/detectors.py": "d401411e9ebe84aff0e7f8552bc046f50120e2b76ceee61a8ac5ac9c8b0b7249",
+    "src/stilltrue/adapter.py": "4b0a915ebb8f89287c9c57695761ccb6dc758480d5821557d58dd01f6094d683",
+    "src/stilltrue/evidence.py": "b9c6e08597a95b9adf572fbd527a6be199341552ae156b24863c34d71f692d94",
+    "bench/oracles/replay_tlc.py": "6a4f8dcd0b8a791eed0633c1011c1527db12c9579185cfa1b78d8220a9135b45"
   },
   "selection_rule": {
     "population": "public repositories under github.com/fivetran whose name starts with 'dbt_'",
@@ -29,8 +28,8 @@
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
-    "round": 2,
-    "round_1": "dbt_fivetran_log, 13/32 with 9.59% false positives. Its two failure modes were fixed in 954415d, which is why it is excluded above -- a source that shaped the code cannot grade it. Result kept in bench/HOLDOUT-REPORT-v1.md."
+    "round": 3,
+    "history": "Rounds 1 and 2 graded a detector that has since been replaced. It guessed which tokens were field names and guessed renames by string similarity; the current one asks DataHub's change log instead (ce3f819). Their sources -- dbt_fivetran_log and dbt_hubspot -- are retained as records, not as evidence for this system: their labels mark 'descriptions that were later edited', and in 9 of dbt_shopify's 10 identifier-change positives the referenced token was never a column of that model at either end of the window. Those labels do not measure what this detector does."
   },
-  "note": "NYC TLC and fivetran/dbt_shopify are development benchmarks and are NOT covered by this freeze -- both shaped the code before it existed. See docs/VALIDATION-INTEGRITY.md."
+  "note": "The NYC TLC replay is a development benchmark and is NOT covered by this freeze -- that data shaped this detector. See docs/VALIDATION-INTEGRITY.md."
 }

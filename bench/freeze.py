@@ -30,10 +30,9 @@ FREEZE_FILE = ROOT / "bench" / "freeze.json"
 
 FROZEN_FILES = [
     "src/stilltrue/detectors.py",     # the rules themselves
-    "src/stilltrue/adapter.py",       # authored_description: which text gets judged
+    "src/stilltrue/adapter.py",       # which text gets judged, and the change-log read
     "src/stilltrue/evidence.py",      # what counts as a citation
-    "bench/oracles/mine_drift_labels.py",  # category definitions and the label rules
-    "bench/run_shopify_bench.py",     # scoring, including the negative pass
+    "bench/oracles/replay_tlc.py",    # how a replay is scored
 ]
 
 # Written before any candidate repository was inspected. Mechanical on purpose:
@@ -59,11 +58,15 @@ SELECTION_RULE = {
     },
     "runs_allowed": 1,
     "on_result": "published as measured; the frozen files are not modified in response",
-    "round": 2,
-    "round_1": (
-        "dbt_fivetran_log, 13/32 with 9.59% false positives. Its two failure modes were "
-        "fixed in 954415d, which is why it is excluded above -- a source that shaped the "
-        "code cannot grade it. Result kept in bench/HOLDOUT-REPORT-v1.md."
+    "round": 3,
+    "history": (
+        "Rounds 1 and 2 graded a detector that has since been replaced. It guessed which "
+        "tokens were field names and guessed renames by string similarity; the current one "
+        "asks DataHub's change log instead (ce3f819). Their sources -- dbt_fivetran_log and "
+        "dbt_hubspot -- are retained as records, not as evidence for this system: their "
+        "labels mark 'descriptions that were later edited', and in 9 of dbt_shopify's 10 "
+        "identifier-change positives the referenced token was never a column of that model "
+        "at either end of the window. Those labels do not measure what this detector does."
     ),
 }
 
@@ -85,9 +88,8 @@ def build() -> dict:
         "files": {rel: file_hash(rel) for rel in FROZEN_FILES},
         "selection_rule": SELECTION_RULE,
         "note": (
-            "NYC TLC and fivetran/dbt_shopify are development benchmarks and are NOT "
-            "covered by this freeze -- both shaped the code before it existed. "
-            "See docs/VALIDATION-INTEGRITY.md."
+            "The NYC TLC replay is a development benchmark and is NOT covered by this "
+            "freeze -- that data shaped this detector. See docs/VALIDATION-INTEGRITY.md."
         ),
     }
 
