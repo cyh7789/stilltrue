@@ -143,7 +143,7 @@ def test_case_variant_is_drift_not_current():
 def test_finding_order_is_stable_across_processes():
     """Ids are assigned by position, so unstable ordering makes every documented id wrong.
 
-    referenced_identifiers returns a set. Set iteration order for strings depends
+    identifier_mentions draws on regex finds. Set iteration order for strings depends
     on PYTHONHASHSEED, which is randomised per process -- so this only shows up
     across runs, never within one. It is how the finding id in
     examples/tlc-rename stopped matching what `make demo` printed.
@@ -174,59 +174,122 @@ def test_finding_order_is_stable_across_processes():
     assert len(orders) == 1, f"ordering varied by hash seed: {orders}"
 
 
-# --- Prose that names something other than a column of this table -----------
-# Every string below is verbatim from fivetran/dbt_shopify or
-# fivetran/dbt_fivetran_log, and every one produced a false DRIFT verdict.
-# The shared shape: the sentence itself says the token is not a field here.
+# --- Evidence-gated assertion ----------------------------------------------
+# An assertion needs proof the token was a field of this table. Two things
+# qualify, and both come from DataHub rather than from reading the prose:
+#   a near-match in the current schema  -> it was renamed
+#   a removal in DataHub's change log   -> it was deleted
+# Everything else abstains. Strings below are verbatim from the three corpora.
+
+from stilltrue.detectors import VanishedField, vanished_fields  # noqa: E402
+
 
 def _fields(*names):
     return [{"fieldPath": n, "description": "", "nativeDataType": "unknown"} for n in names]
 
 
-def _verdicts(desc, *schema, subject=None):
+def _verdicts(desc, *schema, vanished=None, subject=None):
     fields = _fields(*schema)
     fields[0] = {**fields[0], "description": desc}
-    found = detect_schema_break(DBT_URN, "", fields, ["ev"])
+    found = detect_schema_break(DBT_URN, "", fields, ["ev"], vanished=vanished)
     return [f.verdict for f in found
             if f.category == "D1_SCHEMA_BREAK" and (subject is None or f.subject == subject)]
 
 
-def test_enumerated_values_are_not_field_references():
-    """dbt_fivetran_log: one description listed five statuses and produced five false positives."""
-    desc = ("Current sync and connection status of the connection. Possible values include "
+def _gone(name, operation="REMOVE"):
+    return {name: VanishedField(name=name, operation=operation, observed_at=1785043063766,
+                                semantic_version="1.0.0",
+                                datahub_says=f"removal of field: '{name}'")}
+
+
+def test_a_rename_candidate_in_the_current_schema_still_asserts():
+    """The TLC event, and it must survive with no change history at all."""
+    assert _verdicts("Includes `airport_fee`.", "Airport_fee", "fare_amount",
+                     vanished=None, subject="airport_fee") == ["DRIFT"]
+
+
+def test_a_field_datahub_says_was_removed_asserts():
+    """The other half: deleted with no similarly-named replacement to point at."""
+    assert _verdicts("Derived from `legacy_total`.", "amount", "id",
+                     vanished=_gone("legacy_total"), subject="legacy_total") == ["DRIFT"]
+
+
+def test_the_change_event_travels_with_the_finding():
+    """A steward has to be able to check the claim against DataHub's own log."""
+    fields = _fields("amount")
+    fields[0] = {**fields[0], "description": "Derived from `legacy_total`."}
+    f = [x for x in detect_schema_break(DBT_URN, "", fields, ["ev"], vanished=_gone("legacy_total"))
+         if x.subject == "legacy_total"][0]
+
+    assert "1.0.0" in f.reality and "removal of field" in f.reality
+
+
+def test_enumerated_values_are_structurally_incapable_of_asserting():
+    """dbt_fivetran_log. No marker list: `broken` was never a field, so there is nothing to assert."""
+    desc = ("Current sync status. Possible values include "
             "`broken`, `deleted`, `incomplete`, `connected`, `paused`")
-    assert "DRIFT" not in _verdicts(desc, "connection_health", "connection_id")
+    assert "DRIFT" not in _verdicts(desc, "connection_health", "connection_id",
+                                    vanished=_gone("something_else"))
 
 
-def test_such_as_enumeration_is_not_a_field_reference():
-    """dbt_shopify: `in_transit`, `label_printed` and friends are shipment states, not columns."""
-    desc = 'The status, such as `in_transit`, `label_printed`, or `out_for_delivery`.'
-    assert "DRIFT" not in _verdicts(desc, "status", "shipment_id")
+def test_entity_type_names_need_no_special_case():
+    """dbt_hubspot: DEAL/CONTACT/COMPANY are object types, absent from the change log."""
+    assert "DRIFT" not in _verdicts("Array of `DEAL` ids associated with the ticket.",
+                                    "deal_ids", "ticket_id", vanished={})
 
 
-def test_foreign_key_prose_names_a_table_not_a_column():
-    """dbt_fivetran_log: correct documentation of a relationship, read as a broken reference."""
-    desc = "Foreign key referencing the ID of the `account` that the user belongs to."
-    assert "DRIFT" not in _verdicts(desc, "account_id", "user_id")
+def test_foreign_key_prose_needs_no_relation_marker():
+    assert "DRIFT" not in _verdicts(
+        "Foreign key referencing the ID of the `account` that the user belongs to.",
+        "account_id", "user_id", vanished={})
 
 
-def test_a_noun_qualified_identifier_is_not_a_field():
-    """`insert_overwrite` is qualified as a method; the existing rule only knew about schemas and tables."""
-    desc = "Used for partitioning with the `insert_overwrite` incremental method."
-    assert "DRIFT" not in _verdicts(desc, "partition_key", "row_id", subject="insert_overwrite")
+def test_an_unresolved_doc_block_yields_no_field_candidate():
+    """dbt_hubspot ships `{{ doc("history_source") }}`; the argument is a lookup key."""
+    verdicts = _verdicts('{{ doc("history_source") }}', "change_source", "id", vanished={})
+    assert "DRIFT" not in verdicts
+    assert "INSUFFICIENT_EVIDENCE" in verdicts
 
 
-def test_a_dotted_reference_points_at_another_entity():
-    """`incremental_mar.schema_name` is another model's column, not two missing ones here."""
-    desc = "Name of the connection. This may differ from `incremental_mar.schema_name`."
-    assert "DRIFT" not in _verdicts(desc, "connection_name", "connection_id")
+def test_no_change_history_is_reported_as_such():
+    """Absence of history is not evidence of drift, and the reader must be told which it was."""
+    fields = _fields("new_field")
+    fields[0] = {**fields[0], "description": "Derived from `old_field`."}
+    never = [f for f in detect_schema_break(DBT_URN, "", fields, ["ev"], vanished=None)
+             if f.subject == "old_field"][0]
+    checked = [f for f in detect_schema_break(DBT_URN, "", fields, ["ev"], vanished={})
+               if f.subject == "old_field"][0]
+
+    assert never.verdict == checked.verdict == "INSUFFICIENT_EVIDENCE"
+    assert "no change history" in never.reality
+    assert "no change history" not in checked.reality
 
 
-def test_a_rename_candidate_still_wins_over_all_of_this():
-    """The guard rail: these rules must never swallow the event the project exists to catch.
+def test_spurious_renames_are_filtered_by_the_current_schema():
+    """DataHub's differ is positional; on a busy diff it reports renames that did not happen.
 
-    A near-match in the schema is the strongest signal available, so it outranks
-    any prose context -- even prose that looks like an enumeration.
+    Real output from replaying NYC TLC schema history: three fields were claimed
+    to have vanished, two of which are still in the schema. Only the third is.
     """
-    desc = "Possible values include `airport_fee` and others."
-    assert _verdicts(desc, "Airport_fee", "fare_amount", subject="airport_fee") == ["DRIFT"]
+    events = [
+        {"operation": "MODIFY", "field": "RatecodeID", "timestamp": 1, "semantic_version": "1.0.0",
+         "description": "renaming of the field 'RatecodeID to Airport_fee'"},
+        {"operation": "MODIFY", "field": "VendorID", "timestamp": 1, "semantic_version": "1.0.0",
+         "description": "renaming of the field 'VendorID to RatecodeID'"},
+        {"operation": "REMOVE", "field": "airport_fee", "timestamp": 1, "semantic_version": "1.0.0",
+         "description": "removal of field: 'airport_fee'"},
+    ]
+    gone = vanished_fields(events, current={"RatecodeID", "VendorID", "Airport_fee"})
+
+    assert set(gone) == {"airport_fee"}
+
+
+def test_a_field_that_came_back_is_not_vanished():
+    """Removed in one version, re-added in a later one. The log has both; only the end state counts."""
+    events = [
+        {"operation": "REMOVE", "field": "amount", "timestamp": 1, "semantic_version": "1.0.0",
+         "description": "removal of field: 'amount'"},
+        {"operation": "ADD", "field": "amount", "timestamp": 2, "semantic_version": "1.1.0",
+         "description": "newly added field 'amount'"},
+    ]
+    assert vanished_fields(events, current={"amount"}) == {}

@@ -33,8 +33,35 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT.parent / "src"))
 
 from oracles.mine_drift_labels import sql_columns_at            # noqa: E402  (frozen)
-from run_shopify_bench import SCORED_AGAINST_D1, TIER_A, score_negatives  # noqa: E402  (frozen)
-from stilltrue.detectors import detect_schema_break             # noqa: E402  (frozen)
+from run_shopify_bench import SCORED_AGAINST_D1, TIER_A  # noqa: E402  (frozen)
+
+
+def score_negatives_with_history(repo, rows, columns_at):
+    """The frozen negative pass, plus the prior-schema evidence the new gate needs.
+
+    A negative carries one commit, so "prior" is that same commit: the state the
+    description was written against. If the token was never a field there either,
+    there is nothing to assert -- which is the whole point of the redesign.
+    """
+    false_positives, scored = [], 0
+    for r in rows:
+        cols = columns_at(r["commit"], r["model"])
+        if not cols or r["column"] not in cols:
+            continue
+        scored += 1
+        fields = [
+            {"fieldPath": c,
+             "description": r["description"] if c == r["column"] else "",
+             "nativeDataType": "unknown"}
+            for c in sorted(cols)
+        ]
+        prior = PriorSchema(frozenset(cols), r["commit"][:12], "ev_bench_prior")
+        urn = f"urn:li:dataset:(urn:li:dataPlatform:dbt,{repo.name}.{r['model']},PROD)"
+        if any(f.category == "D1_SCHEMA_BREAK" and f.verdict == "DRIFT"
+               for f in detect_schema_break(urn, "", fields, ["ev_bench"], prior_schema=prior)):
+            false_positives.append(r)
+    return scored, len(false_positives), false_positives
+from stilltrue.detectors import PriorSchema, detect_schema_break  # noqa: E402
 
 
 def main() -> None:
@@ -70,8 +97,15 @@ def main() -> None:
             }
             for c in documented
         ]
+        # The schema this model had when the description was written. Same
+        # meaning as DataHub aspect version 1 in production: what the table
+        # looked like the last time someone wrote about it.
+        prior = columns_at(r["c1"], r["model"])
+        prior_schema = (PriorSchema(frozenset(prior), r["c1"][:12], "ev_bench_prior")
+                        if prior else None)
         urn = f"urn:li:dataset:(urn:li:dataPlatform:dbt,{repo.name}.{r['model']},PROD)"
-        breaks = [f for f in detect_schema_break(urn, "", fields, ["ev_bench"])
+        breaks = [f for f in detect_schema_break(urn, "", fields, ["ev_bench"],
+                                                 prior_schema=prior_schema)
                   if f.category == "D1_SCHEMA_BREAK"]
         if any(f.verdict == "DRIFT" for f in breaks):
             caught.append(r)
@@ -85,7 +119,7 @@ def main() -> None:
     d1_caught = [r for r in caught if r["category"] in SCORED_AGAINST_D1]
 
     negatives = [r for r in rows if r.get("label") == "stable"]
-    neg_scored, neg_fp, fp_rows = score_negatives(repo, negatives, columns_at)
+    neg_scored, neg_fp, fp_rows = score_negatives_with_history(repo, negatives, columns_at)
 
     print(f"source:            {repo.name}")
     print(f"labels:            {labels.name}")

@@ -26,6 +26,7 @@ SourceFunction = Literal[
     "list_schema_fields",
     "get_lineage",
     "get_dataset_queries",
+    "timeline",
 ]
 
 

@@ -23,7 +23,7 @@ from typing import Optional
 import typer
 
 from .adapter import ReadOnlyDataHubAdapter, authored_description
-from .detectors import detect_lineage_drift, detect_schema_break
+from .detectors import detect_lineage_drift, detect_schema_break, vanished_fields
 from .executor import WriteExecutor
 from .ledger import AuditLedger
 from .proposal import PolicyGate, Proposal, check_approval
@@ -86,7 +86,19 @@ def scan(
             fields = schema.get("fields", [])
             evidence_ids = [ev_entity, ev_schema]
 
-            found = detect_schema_break(u, description, fields, evidence_ids)
+            # Ask DataHub what it has seen leave this dataset. Without a change
+            # history the detector can still catch renames (a near-match in the
+            # current schema), but not deletions -- and it says which.
+            vanished = None
+            try:
+                events, ev_timeline = adapter.schema_changes(u)
+                vanished = vanished_fields(events, {f.get("fieldPath", "") for f in fields})
+                evidence_ids = evidence_ids + [ev_timeline]
+            except Exception:
+                pass  # no history is a valid state, not a failure
+
+            found = detect_schema_break(u, description, fields, evidence_ids,
+                                        vanished=vanished)
 
             try:
                 lineage, ev_lineage = adapter.get_lineage(u)
