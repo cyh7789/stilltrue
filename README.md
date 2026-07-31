@@ -56,7 +56,10 @@ contradiction in DataHub's UI to the ten-record hash chain to every number with
 the denominator under it.
 
 To run it, one command takes a machine with Docker from nothing to the full
-loop:
+loop, and there is a machine one click away if you would rather not use your
+own:
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/cyh7789/stilltrue?quickstart=1)
 
 ```bash
 make demo-from-cold
@@ -66,9 +69,12 @@ It starts DataHub, loads the NYC TLC dataset in its drifted state, then scans,
 refuses an unapproved write, refuses a confirmation that no longer matches the
 text, writes the approved fix back, and reads it out of DataHub again. The UI
 lands on port 9002 (`datahub`/`datahub`); the dataset it just corrected is
-`nyc_tlc.yellow_tripdata`, Columns tab, search `airport`. First run takes a few
-minutes while DataHub's images pull. Verified end to end on 2026-07-31; the
-DataHub containers settle at about 4 GiB.
+`nyc_tlc.yellow_tripdata`, Columns tab, search `airport`.
+
+Both paths were run end to end on 2026-07-31. In a 2-core, 8 GB Codespace the
+whole thing took **12 minutes 21 seconds** from a cold container, most of it
+DataHub's images pulling; MySQL and GMS log a few transient errors while the
+stack settles and the run waits them out. The containers settle at about 4 GiB.
 
 ## What it does
 
