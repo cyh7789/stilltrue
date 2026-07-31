@@ -48,23 +48,27 @@ descriptions out of 14, with no false alarms across 503 correct ones**
 benchmarks ship with a switch that breaks them on purpose: remove the schema
 rewrite and the score is zero.
 
-## Try it without installing anything
+## Running it yourself
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/cyh7789/stilltrue?quickstart=1)
+Everything below is checkable without running anything:
+[**EVIDENCE.md**](EVIDENCE.md) walks the whole chain in three minutes, from the
+contradiction in DataHub's UI to the ten-record hash chain to every number with
+the denominator under it.
 
-One command in the Codespace terminal runs the whole loop against a real
-DataHub, from cold:
+To run it, one command takes a machine with Docker from nothing to the full
+loop:
 
 ```bash
-make codespace-demo
+make demo-from-cold
 ```
 
 It starts DataHub, loads the NYC TLC dataset in its drifted state, then scans,
 refuses an unapproved write, refuses a confirmation that no longer matches the
-text, writes the approved fix back, and reads it out of DataHub again. The UI is
-on the forwarded port 9002 (`datahub`/`datahub`); the dataset it just corrected
-is `nyc_tlc.yellow_tripdata`, Columns tab, search `airport`. First run takes a
-few minutes while DataHub's images pull.
+text, writes the approved fix back, and reads it out of DataHub again. The UI
+lands on port 9002 (`datahub`/`datahub`); the dataset it just corrected is
+`nyc_tlc.yellow_tripdata`, Columns tab, search `airport`. First run takes a few
+minutes while DataHub's images pull. Verified end to end on 2026-07-31; the
+DataHub containers settle at about 4 GiB.
 
 ## What it does
 

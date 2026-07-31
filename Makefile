@@ -5,7 +5,7 @@ SERVER ?= http://localhost:8080
 TLC_URN = urn:li:dataset:(urn:li:dataPlatform:s3,nyc_tlc.yellow_tripdata,PROD)
 SHOPIFY ?= /tmp/dbt_shopify
 
-.PHONY: help demo bench-replay test check-claims datahub-up load-benchmark clean
+.PHONY: help demo demo-from-cold bench-replay test check-claims datahub-up load-benchmark clean
 
 help:
 	@echo "make datahub-up       start a local DataHub (takes a few minutes the first time)"
@@ -14,14 +14,14 @@ help:
 	@echo "make bench-replay     re-run every baseline and regenerate bench/REPORT.md"
 	@echo "make test             unit tests"
 	@echo "make check-claims     every number in the docs, against the file it came from"
-	@echo "make codespace-demo   one command from a cold Codespace: DataHub, data, full loop"
+	@echo "make demo-from-cold   one command from nothing: start DataHub, load data, run the loop"
 
 datahub-up:
 	datahub docker quickstart
 
-# The zero-install path: a cold GitHub Codespace to the whole loop, one command.
-# Kept separate from `demo` so the local path stays as short as it was.
-codespace-demo:
+# Nothing running to the whole loop, one command. Kept separate from `demo` so
+# the local path stays as short as it was for anyone who already has DataHub up.
+demo-from-cold:
 	@echo "==> starting DataHub (first run pulls images, allow ~5 minutes)"
 	datahub docker quickstart
 	@echo "==> waiting for the graph to accept writes"
