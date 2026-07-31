@@ -42,7 +42,10 @@ Row 7 is the one worth reading twice. The confirmation token `a844edb7f3b9` was
 issued for one piece of text; the write that arrived carried a different text,
 so its proposal hashed to `ec39d56f76df` and the token no longer matched. The
 write failed closed. A ledger that recorded only successful writes would be a
-changelog, so the two refusals are in the chain with everything else.
+changelog, so every refusal is in the chain with everything else: three of the
+ten records, covering both refusal conditions. Rows 3 and 5 are the same
+condition twice, because `scripts/demo.sh` attempts the write once as a dry run
+and once for real and the gate refuses both.
 
 `stilltrue verify --run 94b7e03ee841` recomputes the chain and prints
 `OK: chain valid (10 records)`.
