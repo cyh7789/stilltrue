@@ -112,7 +112,10 @@ cannot fail is not evidence.
 - The official DataHub datapacks are the development set, so the 77-dataset scan
   is scale, not generalisation.
 - Two repositories from one organisation, both dbt, both mined by the same
-  script. That is what the 14/14 rests on.
+  script. That is what the 14/14 rests on. A third walk over 80 repositories in
+  six other organisations found none that met the same frozen bar, and the null
+  result is published rather than fixed by widening the rule:
+  [`bench/HOLDOUT-v3-RESULT.md`](bench/HOLDOUT-v3-RESULT.md).
 - D2 (freshness) and D5 (semantic conflict) are not implemented. The reason is a
   measurement, not a shrug: [`docs/D2-FEASIBILITY.md`](docs/D2-FEASIBILITY.md).
 - The four upstream pull requests are open, not merged.

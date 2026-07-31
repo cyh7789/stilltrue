@@ -494,15 +494,26 @@ one thing, write another"; it does not close "the writer approved their own
 change". Enforcing *who* may approve needs a receipt the executor can verify but
 not issue — that is not built.
 
-**The benchmarks measure fit, not transfer.** Three sources are scored — NYC TLC,
-`dbt_hubspot`, `dbt_iterable` — and none is a blind holdout for the code as it
-now stands. TLC and HubSpot shaped the detector directly. Iterable was a blind
-holdout for the *old* orphaned-doc harness, but the harness that scores it now
-was written after its result was known, so its blindness is spent. What carries
-those numbers is the mutation in
-[`bench/HOLDOUT-orphan-iterable-datahub.md`](bench/HOLDOUT-orphan-iterable-datahub.md) —
-that the benchmark scores 0/2 when the schema rewrite is removed — not the order
-things were run in. The labels are still ones we did not write.
+**Most of the benchmarks measure fit; one measures transfer, and only inside one
+company.** Four sources are scored. NYC TLC and `dbt_hubspot` shaped the detector
+directly, so they measure fit. `dbt_iterable` was a blind holdout for the *old*
+orphaned-doc harness, but the harness that scores it now was written after its
+result was known, so its blindness is spent; what carries its number is the
+mutation in
+[`bench/HOLDOUT-orphan-iterable-datahub.md`](bench/HOLDOUT-orphan-iterable-datahub.md),
+that the benchmark scores 0/2 with the schema rewrite removed, rather than the
+order things were run in. `dbt_microsoft_ads` is the one genuine blind holdout
+for the code as it stands: its
+[declaration](bench/HOLDOUT-v2-DECLARATION.md) was committed before the walk ran
+and the selection rule, the miner and the scorer were all already frozen.
+
+That transfer is measured across two repositories owned by one company. A third
+walk tried to widen it and found nothing:
+[`bench/HOLDOUT-v3-RESULT.md`](bench/HOLDOUT-v3-RESULT.md) records 80
+repositories in six other organisations, every one rejected by a threshold, with
+the null result published instead of the rule loosened until something passed.
+So the honest boundary is that the mechanism is shown to transfer between two
+repositories by the same authors, and is hard to test beyond them on public code.
 Timeline with commit hashes: [`docs/VALIDATION-INTEGRITY.md`](docs/VALIDATION-INTEGRITY.md).
 
 **Five drift families were designed; two run.** D1 (schema break, undocumented

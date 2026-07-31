@@ -221,7 +221,10 @@ removes the schema rewrite and takes the score to zero.</p>
   seeing its scores, so it is a third-party benchmark, and the timeline of who knew what
   when is in <a href="{GH}/docs/VALIDATION-INTEGRITY.md">VALIDATION-INTEGRITY.md</a>.</li>
 <li>Both holdout repositories are dbt packages from one organisation, mined by the same
-  script. That is what the 14 of 14 rests on.</li>
+  script. That is what the 14 of 14 rests on. A third walk over 80 repositories in six
+  other organisations found none that met the same frozen bar; the null result is
+  published rather than fixed by widening the rule
+  (<a href="{GH}/bench/HOLDOUT-v3-RESULT.md">HOLDOUT-v3-RESULT.md</a>).</li>
 <li>Two detectors (freshness, semantic conflict) are unimplemented. The reason is written
   up as a measurement in <a href="{GH}/docs/D2-FEASIBILITY.md">D2-FEASIBILITY.md</a>.</li>
 <li>All four upstream pull requests are still open and none has been reviewed.</li>

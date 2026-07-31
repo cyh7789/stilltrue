@@ -1,0 +1,85 @@
+population: 80 repositories across 6 organisations
+thresholds imported from the frozen bench/select_holdout.py
+
+  skip brooklyn-data/dbt-enablement                 licence none
+  skip brooklyn-data/dbt-fusion-devcontainer        commits 28 < 200
+  skip brooklyn-data/dbt_artifacts                  mined positives 0 < 30
+  skip brooklyn-data/dbtenv                         commits 152 < 200
+  skip calogica/dbt-date                            descriptions 0 < 50
+  skip calogica/dbt-expectations                    descriptions 0 < 50
+  skip calogica/dbtbt                               licence GPL-3.0
+  skip dbt-labs/airflow-dbt-cloud                   commits 14 < 200
+  skip dbt-labs/bigquery_dbt_partner_demo           licence none
+  skip dbt-labs/databricks_dbt_partner_demo         licence none
+  skip dbt-labs/dbt-adapters                        descriptions 0 < 50
+  skip dbt-labs/dbt-audit-helper                    descriptions 0 < 50
+  skip dbt-labs/dbt-cli                             licence none
+  skip dbt-labs/dbt-cloud-group-training-setup      licence none
+  skip dbt-labs/dbt-cloud-openapi-spec              licence none
+  skip dbt-labs/dbt-cloud-simulation-project-extra-large licence none
+  skip dbt-labs/dbt-cloud-simulation-project-large  licence none
+  skip dbt-labs/dbt-cloud-simulation-project-XXL    licence none
+  skip dbt-labs/dbt-cloud-simulation-project-XXXL   licence none
+  skip dbt-labs/dbt-codegen                         descriptions 0 < 50
+  skip dbt-labs/dbt-common                          descriptions 0 < 50
+  skip dbt-labs/dbt-completion.bash                 commits 65 < 200
+  skip dbt-labs/dbt-converter                       licence none
+  skip dbt-labs/dbt-core                            descriptions 0 < 50
+  skip dbt-labs/dbt-core-bundles                    licence none
+  skip dbt-labs/dbt-database-adapter-scaffold       commits 73 < 200
+  skip dbt-labs/dbt-docs                            descriptions 0 < 50
+  skip dbt-labs/dbt-Explorer-on-demand-course-finance licence none
+  skip dbt-labs/dbt-Explorer-on-demand-course-platform licence none
+  skip dbt-labs/dbt-external-tables                 descriptions 0 < 50
+  skip dbt-labs/dbt-extractor                       descriptions 0 < 50
+  skip dbt-labs/dbt-integration-project             licence none
+  skip dbt-labs/dbt-jobs-as-code                    descriptions 0 < 50
+  skip dbt-labs/dbt-jsonschema                      descriptions 0 < 50
+  skip dbt-labs/dbt-labs-experimental-features      commits 113 < 200
+  skip dbt-labs/dbt-learn-group-training            licence none
+  skip dbt-labs/dbt-learn-gt-init                   licence none
+  skip dbt-labs/dbt-learn-gt-init-adv-topics        licence none
+  skip dbt-labs/dbt-learn-gt-init-mesh              licence none
+  skip dbt-labs/dbt-learn-gt-level-up               licence none
+  skip dbt-labs/dbt-learn-unit-testing              licence none
+  skip dbt-labs/dbt-Mesh-on-demand-course-finance   licence none
+  skip dbt-labs/dbt-Mesh-on-demand-course-platform  licence none
+  skip dbt-labs/dbt-onboarding-exemplar             licence none
+  skip dbt-labs/dbt-oss-template                    commits 9 < 200
+  skip dbt-labs/dbt-project-evaluator               descriptions 34 < 50
+  skip dbt-labs/dbt-proserv                         licence none
+  skip dbt-labs/dbt-release                         descriptions 0 < 50
+  skip dbt-labs/dbt-rpc                             commits 77 < 200
+  skip dbt-labs/dbt-semantic-interfaces             descriptions 0 < 50
+  skip dbt-labs/dbt-spark-release-test              descriptions 0 < 50
+  skip dbt-labs/dbt-utils                           descriptions 0 < 50
+  skip dbt-labs/dbt-workshop-foundational-project   licence none
+  skip dbt-labs/dbt_datavault_demo                  licence none
+  skip dbt-labs/dbt_metrics                         descriptions 12 < 50
+  skip dbt-labs/dbtcloud-terraforming               licence MPL-2.0
+  skip dbt-labs/docs.getdbt.com                     descriptions 0 < 50
+  skip dbt-labs/fabric_dbt_partner_demo             licence none
+  skip dbt-labs/homebrew-dbt                        licence none
+  skip dbt-labs/homebrew-dbt-cli                    licence none
+  skip dbt-labs/hub.getdbt.com                      licence none
+  skip dbt-labs/hub.getdbt.com-test                 licence none
+  skip dbt-labs/schemas.getdbt.com                  commits 120 < 200
+  skip dbt-labs/snowflake_dbt_partner_demo          licence none
+  skip dbt-labs/terraform-provider-dbtcloud         descriptions 0 < 50
+  skip dbt-labs/vscode-dbt                          commits 14 < 200
+  skip elementary-data/awesome-dbt-tests            commits 8 < 200
+  skip elementary-data/dbt-core                     descriptions 0 < 50
+  skip elementary-data/dbt-data-reliability         mined positives 19 < 30
+  skip elementary-data/dbt-metabase                 commits 118 < 200
+  skip infinitelambda/dbt-alert                     commits 35 < 200
+  skip infinitelambda/dbt-audit-helper-ext          commits 109 < 200
+  skip infinitelambda/dbt-central-app               licence none
+  skip infinitelambda/dbt-data-diff                 commits 147 < 200
+  skip infinitelambda/dbt-data-quality-demo         commits 18 < 200
+  skip infinitelambda/dbt-data-vault-template       commits 3 < 200
+  skip infinitelambda/dbt-snowflake-evaluator       commits 9 < 200
+  skip infinitelambda/dbt-tags                      commits 102 < 200
+  skip Montreal-Analytics/dbt-gloss-deprecated      commits 41 < 200
+  skip Montreal-Analytics/dbt-snowflake-utils       commits 69 < 200
+
+no candidate satisfied the frozen thresholds
