@@ -14,9 +14,22 @@ help:
 	@echo "make bench-replay     re-run every baseline and regenerate bench/REPORT.md"
 	@echo "make test             unit tests"
 	@echo "make check-claims     every number in the docs, against the file it came from"
+	@echo "make codespace-demo   one command from a cold Codespace: DataHub, data, full loop"
 
 datahub-up:
 	datahub docker quickstart
+
+# The zero-install path: a cold GitHub Codespace to the whole loop, one command.
+# Kept separate from `demo` so the local path stays as short as it was.
+codespace-demo:
+	@echo "==> starting DataHub (first run pulls images, allow ~5 minutes)"
+	datahub docker quickstart
+	@echo "==> waiting for the graph to accept writes"
+	@until curl -sf $(SERVER)/health >/dev/null; do sleep 5; done
+	@$(MAKE) demo
+	@echo
+	@echo "The UI is on port 9002 (datahub/datahub). The dataset the demo just"
+	@echo "corrected: nyc_tlc.yellow_tripdata, Columns tab, search airport."
 
 # Resets the description to what it was before anyone fixed it, so `make demo`
 # is repeatable -- the demo's whole point is writing that fix back.

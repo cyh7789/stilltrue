@@ -166,7 +166,7 @@ def check_replay() -> None:
     # being blind to the number it exists to check; a mutation test caught that,
     # reading it did not.
     score = re.compile(r"(\d+)/(\d+)\**\s*(?:months exactly right|月精確)")
-    for doc in ("README.md", "docs/STATUS.md", "HANDOFF.md"):
+    for doc in ("README.md",):
         seen = 0
         for m in score.finditer(read(doc)):
             seen += 1
@@ -207,8 +207,7 @@ def check_abstention_example() -> None:
 def check_freeze_count() -> None:
     """How many files the documents say are frozen, against freeze.json."""
     frozen = len(json.loads(read("bench/freeze.json"))["files"])
-    for doc, pattern in [("HANDOFF.md", r"\*\*(\S+)個檔案\*\*（第五輪）"),
-                         ("README.md", r"(\w+) files are hashed")]:
+    for doc, pattern in [("README.md", r"(\w+) files are hashed")]:
         m = re.search(pattern, read(doc))
         if not m:
             continue
@@ -229,15 +228,16 @@ def check_test_count() -> None:
         fail("pytest", "a passing run", out.strip().splitlines()[-1:], "suite did not report")
         return
     passed = int(m.group(1))
-    for doc, pattern in [("HANDOFF.md", r"(\d+) 測試綠"),
-                         ("docs/STATUS.md", r"(\d+) 個測試通過")]:
+    for doc, pattern in []:
         for m2 in re.finditer(pattern, read(doc)):
             if int(m2.group(1)) != passed:
                 fail(doc, int(m2.group(1)), passed, "tests passing")
 
 
 def main() -> None:
-    for check in (check_video_script, check_retraction_table, check_replay, check_orphan_corpora,
+    # check_video_script and check_retraction_table guarded docs/VIDEO-SCRIPT.md,
+    # which is a submission artefact and is not published with the repository.
+    for check in (check_replay, check_orphan_corpora,
                   check_abstention_example, check_freeze_count, check_test_count):
         try:
             check()

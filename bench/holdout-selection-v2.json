@@ -1,0 +1,10 @@
+{
+  "repository": "dbt_microsoft_ads",
+  "clone_url": "https://github.com/fivetran/dbt_microsoft_ads.git",
+  "commits": 252,
+  "months": 70,
+  "descriptions": 877,
+  "positives": 39,
+  "negatives": 328,
+  "labels_file": "drift-labels-dbt-microsoft-ads.jsonl"
+}

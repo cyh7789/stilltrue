@@ -40,6 +40,32 @@ against 41 months of the TLC's real published schemas, it scored every month
 exactly right with no false alarms
 ([`bench/REPLAY-REPORT.md`](bench/REPLAY-REPORT.md)).
 
+On two repositories neither the code nor its author had ever opened, both picked
+by a selection rule frozen before the search ran, it found **14 orphaned
+descriptions out of 14, with no false alarms across 503 correct ones**
+([`dbt_iterable`](bench/HOLDOUT-orphan-iterable-datahub.md),
+[`dbt_microsoft_ads`](bench/HOLDOUT-orphan-microsoft-ads-datahub.md)). Both
+benchmarks ship with a switch that breaks them on purpose: remove the schema
+rewrite and the score is zero.
+
+## Try it without installing anything
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/cyh7789/stilltrue?quickstart=1)
+
+One command in the Codespace terminal runs the whole loop against a real
+DataHub, from cold:
+
+```bash
+make codespace-demo
+```
+
+It starts DataHub, loads the NYC TLC dataset in its drifted state, then scans,
+refuses an unapproved write, refuses a confirmation that no longer matches the
+text, writes the approved fix back, and reads it out of DataHub again. The UI is
+on the forwarded port 9002 (`datahub`/`datahub`); the dataset it just corrected
+is `nyc_tlc.yellow_tripdata`, Columns tab, search `airport`. First run takes a
+few minutes while DataHub's images pull.
+
 ## What it does
 
 ```bash
