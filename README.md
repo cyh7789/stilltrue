@@ -50,10 +50,13 @@ rewrite and the score is zero.
 
 ## Running it yourself
 
-Everything below is checkable without running anything:
-[**EVIDENCE.md**](EVIDENCE.md) walks the whole chain in three minutes, from the
-contradiction in DataHub's UI to the ten-record hash chain to every number with
-the denominator under it.
+Everything below is checkable without running anything. The shortest path is
+[**cyh7789.github.io/stilltrue**](https://cyh7789.github.io/stilltrue/): the
+contradiction in DataHub's UI, the ten-record hash chain rendered from the run's
+own ledger file, DataHub's timeline entry, the pixel diff, and every number with
+the denominator under it. [`EVIDENCE.md`](EVIDENCE.md) is the same walk in
+markdown, and the page is generated from the committed artefacts by
+[`scripts/build_pages.py`](scripts/build_pages.py) so the two cannot disagree.
 
 To run it, one command takes a machine with Docker from nothing to the full
 loop, and there is a machine one click away if you would rather not use your

@@ -1,6 +1,8 @@
 # Three minutes, no install: every claim and the file it comes from
 
-Nothing here asks you to run anything. Each row names the artefact in this
+Nothing here asks you to run anything. The same walk is rendered at
+<https://cyh7789.github.io/stilltrue/>, generated from these files by
+`scripts/build_pages.py`. Each row names the artefact in this
 repository that produced it, and the artefacts cross-reference each other: the
 run id in the ledger is the run id in the findings file is the run id quoted in
 the walkthrough. If you would rather run it, `make codespace-demo` or
