@@ -27,8 +27,18 @@ not correct.
 
 StillTrue is an agent whose job is the catalog itself: it reads what humans
 wrote, compares it against what the schema and lineage actually do, and reports
-where the two have come apart — with citations, and never writing anything back
+where the two have come apart, with citations, and never writes anything back
 without a human confirming that exact text.
+
+**On a full catalog scan of 77 datasets it reported 11 drifted descriptions,
+confirmed 12 as still true, and declined to judge 58 (81 checks in total).**
+Zero false drift verdicts. Requiring DataHub's own change log to record a
+departure before calling anything drift is what buys that: the same 25 tables
+produced 6 false verdicts without it
+([`examples/abstention`](examples/abstention/), full output committed). Replayed
+against 41 months of the TLC's real published schemas, it scored every month
+exactly right with no false alarms
+([`bench/REPLAY-REPORT.md`](bench/REPLAY-REPORT.md)).
 
 ## What it does
 
