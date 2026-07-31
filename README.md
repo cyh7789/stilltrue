@@ -426,6 +426,20 @@ It is also the bug this project shipped in its own first version — the TLC
 regression test is what caught it, and it is still in `tests/test_detectors.py`
 with the mistake documented in the docstring.
 
+### Does it only work on dbt?
+
+Both holdouts are dbt packages, so the question is fair. The full-catalog scan
+answers it from data already committed: of the 11 drift verdicts, **dbt produced
+one**. The rest came from `s3` (5), `snowflake` (2), and one each from
+`postgres`, `sqlite` and `looker`. Seven platforms in total, and the detector
+never sees which one it is looking at. It reads descriptions, schema fields and
+the change log through the Agent Context Kit, and those three shapes are the same
+whatever the dataset was ingested from. dbt is where the *labels* can be mined,
+because dbt keeps prose and SQL together in public git history, which is why both
+holdouts are dbt packages. Per-platform table and the caveats:
+[`docs/L3-EVIDENCE.md`](docs/L3-EVIDENCE.md), regenerate with
+`python3 scripts/platform_breakdown.py`.
+
 ### And DataHub's own Context Platform?
 
 Fair question, and the names are close enough that it deserves a direct answer.

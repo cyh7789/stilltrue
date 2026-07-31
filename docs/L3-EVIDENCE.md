@@ -289,6 +289,37 @@ change history to read, so there is no evidence that a token in their prose was
 ever a field — and without that, the tool says so rather than guessing. The
 detector that preceded this one guessed, and was wrong 103 times out of 120.
 
+### Where the verdicts came from
+
+Both holdouts are dbt packages, so it is reasonable to read this project as a dbt
+tool. This scan says otherwise. Regenerate with
+`python3 scripts/platform_breakdown.py`, which reads the same
+`runs/4041b76520f1/findings.jsonl` the figures above come from:
+
+| platform | datasets with prose to check | drift | still true | declined |
+|---|---|---|---|---|
+| `s3` | 2 | 5 | 11 | 0 |
+| `snowflake` | 2 | 2 | 0 | 1 |
+| `postgres` | 1 | 1 | 0 | 10 |
+| `sqlite` | 1 | 1 | 1 | 7 |
+| `dbt` | 2 | 1 | 0 | 3 |
+| `looker` | 1 | 1 | 0 | 0 |
+| `powerbi` | 5 | 0 | 0 | 37 |
+| **total** | **14** | **11** | **12** | **58** |
+
+Seven platforms, and **dbt produced 1 of the 11 drift verdicts**. The detector
+never sees a platform: it reads descriptions, schema fields and the change log
+through the Agent Context Kit, and those are the same three shapes whatever the
+dataset was ingested from. What dbt supplies is a corpus with public git history,
+which is why the holdouts are dbt packages. That is where labels can be mined,
+rather than where the detector works.
+
+Two caveats on the same table. Only 14 of the 77 datasets carry prose to check at
+all, so the other 63 contribute no checks in either direction. And `powerbi`
+accounts for 37 of the 58 abstentions on its own: dashboard entities whose change
+log holds nothing that could support a claim, which is the case the abstention
+rule exists for.
+
 The 11 it does assert:
 
 | dataset | finding | subject |

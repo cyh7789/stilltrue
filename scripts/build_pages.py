@@ -185,7 +185,20 @@ all differences inside x 76-774, y 90-264</pre>
 <a href="{GH}/scripts/prove_invisible.sh"><code>scripts/prove_invisible.sh</code></a>. The
 region that differs is the version chip's clock, not the note.</p>
 
-<h2>5. Every number, and the denominator under it</h2>
+<h2>5. Does it only work on dbt?</h2>
+<p>Both holdouts are dbt packages, so the question is fair. The full catalog scan answers
+it from data already committed: of the 11 drift verdicts, <b>dbt produced one</b>. The
+rest came from <code>s3</code> (5), <code>snowflake</code> (2), and one each from
+<code>postgres</code>, <code>sqlite</code> and <code>looker</code>. Seven platforms, and
+the detector never sees which one it is looking at: it reads descriptions, schema fields
+and the change log through the Agent Context Kit, and those three shapes are the same
+whatever the dataset was ingested from. dbt is where the <i>labels</i> can be mined,
+because dbt keeps prose and SQL together in public git history, which is why both holdouts
+are dbt packages. Per-platform table and the caveats are in
+<a href="{GH}/docs/L3-EVIDENCE.md">L3-EVIDENCE.md</a>; regenerate with
+<a href="{GH}/scripts/platform_breakdown.py"><code>scripts/platform_breakdown.py</code></a>.</p>
+
+<h2>6. Every number, and the denominator under it</h2>
 <div class="card scroll">
 <table>
 <thead><tr><th>Claim</th><th>Denominator</th><th>Where</th></tr></thead>
@@ -213,7 +226,7 @@ region that differs is the version chip's clock, not the note.</p>
 before it was run. Both benchmarks ship with <code>--mutate-skip-rewrite</code>, which
 removes the schema rewrite and takes the score to zero.</p>
 
-<h2>6. What is deliberately not claimed</h2>
+<h2>7. What is deliberately not claimed</h2>
 <ul>
 <li>The official DataHub datapacks are the development set, so the 77-dataset scan
   measures scale. Generalisation is what the two holdout repositories are for.</li>
