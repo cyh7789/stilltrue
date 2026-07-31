@@ -423,6 +423,30 @@ It is also the bug this project shipped in its own first version — the TLC
 regression test is what caught it, and it is still in `tests/test_detectors.py`
 with the mistake documented in the docstring.
 
+### And DataHub's own Context Platform?
+
+Fair question, and the names are close enough that it deserves a direct answer.
+DataHub Cloud's Context Hub is a reviewer workspace: domain experts approve
+AI-synthesized context and "simulate the impact of context changes on text-to-SQL
+results before publishing," with evals defined as golden questions with pass
+criteria. It is in private beta and not in the open-source distribution.
+
+Two things separate it from this, neither of them a knock on it. First, its evals
+fire when somebody is publishing a change; the failure here is the one where
+nobody publishes anything. The TLC renamed a column, no description was edited,
+no review was opened, and the prose sat wrong for two years with no event for a
+pre-publish gate to hang off. Second, golden questions measure downstream
+behaviour and need a model, a question set and a maintained notion of the right
+answer. This check needs none: a token either names a live column or it does not,
+and DataHub's change log either records the departure or it does not. That is
+what lets it abstain on 58 of 81 checks instead of guessing.
+
+They compose in the obvious direction. Generate, review before publish, then
+watch what was already published for the day reality moves underneath it. The
+third step is the one with no open-source implementation.
+[`docs/NATIVE-COMPARISON.md`](docs/NATIVE-COMPARISON.md) carries the quotes and
+the full table.
+
 ## What this does not do
 
 - **It does not judge whether your documentation is well written.** Only whether

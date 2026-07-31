@@ -142,8 +142,49 @@ and asks whether the prose kept up.
 The last row is this project. The row above it is the closest existing thing and
 is not open source: DataHub Cloud's Context Hub is a reviewer workspace with
 built-in evaluations, announced in 2026 and in private beta. StillTrue does not
-replace it and cannot be compared against it — it is the open-source side of the
+replace it and cannot be compared against it. It is the open-source side of the
 same problem.
+
+### Where the Context Platform's loop starts, and where this one does
+
+Worth being precise about, because the names are close enough to sound like the
+same product. DataHub announced the Context Platform in 2026 as three parts:
+Context Intelligence, which "converts your existing enterprise query history and
+your expert analyst graph into a structured semantic index"; Context Hub, "a
+dedicated workspace where domain experts see AI-synthesized context, so they can
+easily approve, enrich, or refine it, and simulate the impact of context changes
+on text-to-SQL results before publishing"; and Context Activation, which serves
+the result to agents. The June 2026 Town Hall describes the evals concretely:
+admins "define evals as golden questions with pass criteria," reviewers "edit,
+comment, and rerun evals before publishing," and each AI-generated document stays
+"unpublished until a human approves it."
+
+Three differences follow from those quotes, and none of them is a criticism of
+that design:
+
+1. **It generates context; this checks context.** Context Intelligence's input is
+   query logs, dashboards and dbt projects, and its output is new context
+   documents. StillTrue writes nothing new. Its input is prose a human already
+   published, and its question is whether that prose still names things that
+   exist.
+2. **Its evals run before publishing; this one runs long after.** A golden-question
+   eval fires when somebody is making a change. The failure in this repository is
+   the one where nobody is making a change: the TLC renamed a column, no
+   description was edited, and no review was opened, so there is no publish event
+   for a pre-publish gate to attach to. The prose went stale in place, silently,
+   for two years.
+3. **Its evals are behavioural; this check is structural.** Pass criteria on
+   golden questions measure whether downstream text-to-SQL still answers well.
+   That catches a class this project cannot see, and it needs an LLM, a question
+   set and a maintained notion of the right answer. The check here needs none of
+   those: a token in a description either names a live column or it does not, and
+   DataHub's change log either records the departure or it does not. That is why
+   it can abstain on 58 of 81 checks instead of guessing, and why the detection
+   path contains no model.
+
+The two compose in the obvious direction. Generate, review before publish, then
+watch what was published for the day the world moves underneath it. The third
+step is the one that has no open-source implementation, which is what this is.
 
 ## What that means for our baselines
 
