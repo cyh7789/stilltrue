@@ -5,8 +5,9 @@ Nothing here asks you to run anything. The same walk is rendered at
 `scripts/build_pages.py`. Each row names the artefact in this
 repository that produced it, and the artefacts cross-reference each other: the
 run id in the ledger is the run id in the findings file is the run id quoted in
-the walkthrough. If you would rather run it, `make codespace-demo` or
-[`README.md`](README.md#try-it-without-installing-anything).
+the walkthrough. If you would rather run it, `make demo-from-cold` takes a
+machine from nothing to the full loop; the one-click Codespace is in
+[`README.md`](README.md#running-it-yourself).
 
 ## 1. The fault, in one frame of DataHub's own UI
 
