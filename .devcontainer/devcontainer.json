@@ -1,20 +1,12 @@
 {
   "name": "StillTrue",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
-  },
+  "image": "mcr.microsoft.com/devcontainers/universal:2-linux",
   "hostRequirements": {
     "cpus": 2,
     "memory": "8gb",
     "storage": "32gb"
   },
-  "postCreateCommand": "pip install -e . && echo 'Run: make codespace-demo'",
-  "customizations": {
-    "vscode": {
-      "extensions": ["ms-python.python"]
-    }
-  },
+  "postCreateCommand": "pip install -e . && echo 'Ready. Run: make demo-from-cold'",
   "forwardPorts": [8080, 9002],
   "portsAttributes": {
     "9002": { "label": "DataHub UI", "onAutoForward": "notify" },
